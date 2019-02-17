@@ -80,7 +80,9 @@ func (h *Handler) SignUpUser(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		log.Noticef("user %s created", user.Username)
+		if len(errors.Errors) == 0 {
+			log.Noticef("user %s created", user.Username)
+		}
 	}
 
 	respJSON, err := json.Marshal(&errors)
