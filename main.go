@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"html/template"
 	"net/http"
 	"os"
@@ -33,6 +32,7 @@ var (
 // Handler пока что только хранит темплейты
 // потом можно добавить grpc клиенты
 type Handler struct {
+	Router http.Handler
 	Tmpls  map[string]*template.Template
 	DBConn *gorm.DB
 }
@@ -42,12 +42,36 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	h.Tmpls["index.html"].ExecuteTemplate(w, "tmp", struct{}{})
 }
 
+// CheckUsername checks if username already used
+func (h *Handler) CheckUsername(w http.ResponseWriter, r *http.Request) {
+	username := &struct {
+		Username string `json:"username"`
+	}{}
+
+	err := decodeBodyJSON(r.Body, username)
+	if err != nil {
+		log.Errorf("unable to decode request body; err: %s", err.Error())
+		http.Error(w, "incorrect json", http.StatusBadRequest)
+		return
+	}
+
+	used := !h.DBConn.First(&User{}, "username = ?", username.Username).RecordNotFound()
+	err = writeApplicationJSON(w, &struct {
+		Used bool `json:"used"`
+	}{
+		Used: used,
+	})
+	if err != nil {
+		log.Errorf("result marshal error: %s", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+}
+
 // SignUpUser creates new user
 func (h *Handler) SignUpUser(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-
 	user := &User{}
-	err := decoder.Decode(user)
+	err := decodeBodyJSON(r.Body, user)
 	if err != nil {
 		log.Errorf("unable to decode request body; err: %s", err.Error())
 		http.Error(w, "incorrect json", http.StatusBadRequest)
@@ -85,15 +109,12 @@ func (h *Handler) SignUpUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respJSON, err := json.Marshal(&errors)
+	err = writeApplicationJSON(w, &errors)
 	if err != nil {
 		log.Errorf("result marshal error: %s", err.Error())
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(respJSON)
 }
 
 func main() {
@@ -129,10 +150,11 @@ func main() {
 			http.FileServer(http.Dir("static/"))))
 	r.HandleFunc("/", h.Index).Methods("GET")
 	r.HandleFunc("/signup", h.SignUpUser).Methods("POST")
+	r.HandleFunc("/users/username_check", h.CheckUsername).Methods("POST")
 
-	handler := AccessLogMiddleware(r)
+	h.Router = AccessLogMiddleware(r)
 	log.Noticef("MainService successfully started at port %d", configuration.Port)
-	err = http.ListenAndServe(":"+strconv.Itoa(configuration.Port), handler)
+	err = http.ListenAndServe(":"+strconv.Itoa(configuration.Port), h.Router)
 	if err != nil {
 		log.Criticalf("cant start main server. err: %s", err.Error())
 		return

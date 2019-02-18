@@ -52,5 +52,5 @@ type Error struct {
 // FromErrors ошибки в форме:
 // (поле, ошибка)
 type FromErrors struct {
-	Errors map[string]*Error
+	Errors map[string]*Error `json:"errors"`
 }
