@@ -2,9 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 )
+
+func writeFatalError(w http.ResponseWriter, statusCode int, logStr, respStr string) {
+	log.Errorf("[Status %d] %s", statusCode, logStr)
+	http.Error(w, respStr, statusCode)
+}
 
 func writeApplicationJSON(w http.ResponseWriter, v interface{}) error {
 	respJSON, err := json.Marshal(v)
@@ -25,4 +31,13 @@ func decodeBodyJSON(body io.Reader, v interface{}) error {
 	}
 
 	return nil
+}
+
+func writeFormErrorsJSON(w http.ResponseWriter, v interface{}) {
+	err := writeApplicationJSON(w, v)
+	if err != nil {
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("result marshal error: %s", err.Error()),
+			"internal server error")
+	}
 }

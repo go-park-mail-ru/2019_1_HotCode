@@ -5,18 +5,43 @@ type Configuration struct {
 	Port int
 }
 
-// User структура для gorm
-type User struct {
-	ID              int64  `json:"id" gorm:"primary_key"`
-	Username        string `json:"username"`
+// BasicUser базовые поля
+type BasicUser struct {
+	Username string `json:"username"`
+}
+
+//TableName имя таблицы
+func (u *BasicUser) TableName() string {
+	return "user"
+}
+
+// InfoUser BasicUser, расширенный служебной инфой
+type InfoUser struct {
+	BasicUser
+	ID     int64 `json:"id" gorm:"primary_key"`
+	Active bool  `json:"active" gorm:"default:true"`
+}
+
+//TableName имя таблицы
+func (u *InfoUser) TableName() string {
+	return "user"
+}
+
+// FormUser BasicUser, расширенный паролем, используется для входа и регистрации
+type FormUser struct {
+	BasicUser
 	PasswordRaw     string `json:"password" gorm:"-"`
 	PasswordEncoded []byte `gorm:"column:password"`
-	Active          bool   `json:"active" gorm:"default:true"`
+}
+
+//TableName имя таблицы
+func (u *FormUser) TableName() string {
+	return "user"
 }
 
 // Validate валидация структуры,
 // TODO: убрать в либу
-func (u *User) Validate(errors map[string]*Error) bool {
+func (u *FormUser) Validate(errors map[string]*Error) bool {
 	wasError := true
 	if u.Username == "" {
 		errors["username"] = &Error{
@@ -35,6 +60,15 @@ func (u *User) Validate(errors map[string]*Error) bool {
 	}
 
 	return wasError
+}
+
+// User структура для gorm
+type User struct {
+	ID              int64  `json:"id" gorm:"primary_key"`
+	Username        string `json:"username"`
+	PasswordRaw     string `json:"password" gorm:"-"`
+	PasswordEncoded []byte `gorm:"column:password"`
+	Active          bool   `json:"active" gorm:"default:true"`
 }
 
 //TableName имя таблицы

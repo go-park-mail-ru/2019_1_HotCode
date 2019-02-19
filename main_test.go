@@ -7,12 +7,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/garyburd/redigo/redis"
 	"github.com/jinzhu/gorm"
 )
 
 const (
-	//DSN настройки соединения
+	// DSN настройки соединения
 	psqlTestStr = "postgres://warscript_test_user:qwerty@localhost/warscript_test_db"
+	// тестовый на 6380
+	redisTestStr = "redis://user:@localhost:6380/0"
 )
 
 const (
@@ -53,8 +56,13 @@ func initHandler() Handler {
 	// Drop user table
 	db.Exec(reloadTableSQL)
 
+	sessionsRedisConn, _ := redis.DialURL(redisTestStr)
+
+	sessionsRedisConn.Do("FLUSHDB")
+
 	return Handler{
-		DBConn: db,
+		DBConn:           db,
+		SessionStoreConn: sessionsRedisConn,
 	}
 }
 
@@ -135,7 +143,7 @@ func TestCheckUsername(t *testing.T) {
 			Endpoint:     "/users/username_check",
 			Handler:      h.CheckUsername,
 		},
-		{ // На создадим юзера
+		{ // Создадим юзера
 			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
 			ExpectedCode: 200,
 			ExpectedBody: `{"errors":{}}`,
@@ -166,6 +174,63 @@ func TestCheckUsername(t *testing.T) {
 			Method:       "POST",
 			Endpoint:     "/users/username_check",
 			Handler:      h.CheckUsername,
+		},
+	}
+
+	runTableAPITests(t, cases)
+}
+
+func TestSignInUser(t *testing.T) {
+	h := initHandler()
+
+	cases := []*Case{
+		{ //Такого юзера пока нет
+			Payload:      []byte(`{"username":"kek","password":"lol"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"errors":{"other":{"code":3,"message":"Wrong username or password","description":"Record Not Found"}}}`,
+			Method:       "POST",
+			Endpoint:     "/signin",
+			Handler:      h.SignInUser,
+		},
+		{ // Создадим юзера
+			Payload:      []byte(`{"username":"kek","password":"lol"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"errors":{}}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+			Handler:      h.SignUpUser,
+		},
+		{ // Теперь юзер логинится
+			Payload:      []byte(`{"username":"kek","password":"lol"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"errors":{}}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+			Handler:      h.SignInUser,
+		},
+		{ // Пустой никнейм нельзя
+			Payload:      []byte(`{"username":"", "password":"lol"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"errors":{"username":{"code":2,"message":"Username is empty","description":""}}}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+			Handler:      h.SignInUser,
+		},
+		{ // Пустой пароль тоже нельзя
+			Payload:      []byte(`{"username":"kek", "password":""}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"errors":{"password":{"code":2,"message":"Password is empty","description":""}}}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+			Handler:      h.SignInUser,
+		},
+		{ // Неправильный формат JSON
+			Payload:      []byte(`{"username":"kek""}`),
+			ExpectedCode: 400,
+			ExpectedBody: "incorrect json\n",
+			Method:       "POST",
+			Endpoint:     "/signup",
+			Handler:      h.SignInUser,
 		},
 	}
 
