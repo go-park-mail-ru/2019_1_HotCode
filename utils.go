@@ -15,7 +15,9 @@ func writeFatalError(w http.ResponseWriter, statusCode int, logStr, respStr stri
 func writeApplicationJSON(w http.ResponseWriter, v interface{}) error {
 	respJSON, err := json.Marshal(v)
 	if err != nil {
-		return err
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("result marshal error: %s", err.Error()),
+			"internal server error")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -31,13 +33,4 @@ func decodeBodyJSON(body io.Reader, v interface{}) error {
 	}
 
 	return nil
-}
-
-func writeFormErrorsJSON(w http.ResponseWriter, v interface{}) {
-	err := writeApplicationJSON(w, v)
-	if err != nil {
-		writeFatalError(w, http.StatusInternalServerError,
-			fmt.Sprintf("result marshal error: %s", err.Error()),
-			"internal server error")
-	}
 }

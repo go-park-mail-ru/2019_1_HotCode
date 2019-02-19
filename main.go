@@ -53,6 +53,25 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	h.Tmpls["index.html"].ExecuteTemplate(w, "tmp", struct{}{})
 }
 
+// CheckToken метод проверяющий токен, возвращает инфу о юзере(без пароля)
+// позже выделится в отдельный запрос
+func (h *Handler) CheckToken(sessionToken string) (*InfoUser, error) {
+	// запросы уедут в либу
+	data, err := redis.Bytes(h.SessionStoreConn.Do("GET", sessionToken))
+	if err != nil {
+		return nil, err
+	}
+
+	userInfo := &InfoUser{}
+	err = json.Unmarshal(data, userInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Noticef("username %s; session %s; check ok", userInfo.Username, sessionToken)
+	return userInfo, nil
+}
+
 // CheckUsername checks if username already used
 func (h *Handler) CheckUsername(w http.ResponseWriter, r *http.Request) {
 	username := &BasicUser{}
@@ -91,83 +110,90 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errors := &FromErrors{
-		Errors: make(map[string]*Error),
+	if errs, ok := user.Validate(); !ok {
+		writeApplicationJSON(w, errs)
+		return
 	}
 
-	if user.Validate(errors.Errors) {
-		storedUser := &User{}
-		// ищем юзера с таким именем
-		if dbc := h.DBConn.First(storedUser, "username = ?", user.Username); dbc.RecordNotFound() {
-			// не нашли
-			log.Errorf("user not found: %s", dbc.Error.Error())
-			errors.Errors["other"] = &Error{
-				Code:        3,
-				Message:     "Wrong username or password",
-				Description: "Record Not Found",
-			}
-			writeFormErrorsJSON(w, &errors)
-			return
-		} else if dbc.Error != nil {
-			// ошибка в базе
-			writeFatalError(w, http.StatusInternalServerError,
-				fmt.Sprintf("database first error: %s", dbc.Error.Error()),
-				"internal server error")
-			return
-		}
-
-		// проверяем пароли
-		if err := bcrypt.CompareHashAndPassword(storedUser.PasswordEncoded, []byte(user.PasswordRaw)); err != nil {
-			log.Errorf("user: %s wrong password", user.Username)
-			errors.Errors["other"] = &Error{
-				Code:        3,
-				Message:     "Wrong username or password",
-				Description: "Record Not Found",
-			}
-			writeFormErrorsJSON(w, &errors)
-			return
-		}
-
-		// записываем токен и инфу
-		sessionToken, err := uuid.NewV4()
-		if err != nil {
-			writeFatalError(w, http.StatusInternalServerError,
-				fmt.Sprintf("session token generate error: %s", err.Error()),
-				"internal server error")
-			return
-		}
-		sessionInfo, err := json.Marshal(&InfoUser{
-			ID:     storedUser.ID,
-			Active: storedUser.Active,
-			BasicUser: BasicUser{
-				Username: storedUser.Username,
+	storedUser := &User{}
+	// ищем юзера с таким именем
+	if dbc := h.DBConn.First(storedUser, "username = ?", user.Username); dbc.RecordNotFound() {
+		// не нашли
+		log.Errorf("user not found: %s", dbc.Error.Error())
+		writeApplicationJSON(w, &FromErrors{
+			Other: []*Error{
+				&Error{
+					Code:        3,
+					Message:     "Wrong username or password",
+					Description: "Record Not Found",
+				},
 			},
 		})
-		if err != nil {
-			writeFatalError(w, http.StatusInternalServerError,
-				fmt.Sprintf("session info marshal error: %s", err.Error()),
-				"internal server error")
-			return
-		}
-
-		// на 30 суток
-		_, err = h.SessionStoreConn.Do("SETEX", sessionToken.String(), "2628000", sessionInfo)
-		if err != nil {
-			writeFatalError(w, http.StatusInternalServerError,
-				fmt.Sprintf("session store save error: %s", err.Error()),
-				"internal server error")
-			return
-		}
-
-		// ставим куку
-		http.SetCookie(w, &http.Cookie{
-			Name:    "JSESSIONID",
-			Value:   sessionToken.String(),
-			Expires: time.Now().Add(2628000 * time.Second),
-		})
+		return
+	} else if dbc.Error != nil {
+		// ошибка в базе
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("database first error: %s", dbc.Error.Error()),
+			"internal server error")
+		return
 	}
 
-	writeFormErrorsJSON(w, &errors)
+	// проверяем пароли
+	if err := bcrypt.CompareHashAndPassword(storedUser.PasswordEncoded, []byte(user.PasswordRaw)); err != nil {
+		log.Errorf("user: %s wrong password", user.Username)
+		writeApplicationJSON(w, &FromErrors{
+			Other: []*Error{
+				&Error{
+					Code:        3,
+					Message:     "Wrong username or password",
+					Description: "Record Not Found",
+				},
+			},
+		})
+		return
+	}
+
+	// записываем токен и инфу
+	sessionToken, err := uuid.NewV4()
+	if err != nil {
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("session token generate error: %s", err.Error()),
+			"internal server error")
+		return
+	}
+	sessionInfo, err := json.Marshal(&InfoUser{
+		ID:     storedUser.ID,
+		Active: storedUser.Active,
+		BasicUser: BasicUser{
+			Username: storedUser.Username,
+		},
+	})
+	if err != nil {
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("session info marshal error: %s", err.Error()),
+			"internal server error")
+		return
+	}
+
+	// на 30 суток
+	_, err = h.SessionStoreConn.Do("SETEX", sessionToken.String(), "2628000", sessionInfo)
+	if err != nil {
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("session store save error: %s", err.Error()),
+			"internal server error")
+		return
+	}
+
+	// ставим куку
+	http.SetCookie(w, &http.Cookie{
+		Name:    "JSESSIONID",
+		Value:   sessionToken.String(),
+		Expires: time.Now().Add(2628000 * time.Second),
+	})
+
+	log.Noticef("username %s signin ok", storedUser.Username)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(sessionInfo)
 }
 
 // SignUpUser creates new user
@@ -181,39 +207,40 @@ func (h *Handler) SignUpUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errors := &FromErrors{
-		Errors: make(map[string]*Error),
+	if errs, ok := user.Validate(); !ok {
+		writeApplicationJSON(w, errs)
+		return
 	}
 
-	if user.Validate(errors.Errors) {
-		user.PasswordEncoded, err = bcrypt.GenerateFromPassword([]byte(user.PasswordRaw), bcrypt.MinCost)
-		if err != nil {
-			writeFatalError(w, http.StatusInternalServerError,
-				fmt.Sprintf("bcrypt hash error: %s", err.Error()),
-				"internal server error")
+	user.PasswordEncoded, err = bcrypt.GenerateFromPassword([]byte(user.PasswordRaw), bcrypt.MinCost)
+	if err != nil {
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("bcrypt hash error: %s", err.Error()),
+			"internal server error")
+		return
+	}
+
+	if dbc := h.DBConn.Create(user); dbc.Error != nil {
+		errorStr := dbc.Error.Error()
+		log.Errorf("database create error: %s", errorStr)
+
+		//TODO: спрятать это в либу
+		if strings.Index(errorStr, "uniq_username") != -1 {
+			writeApplicationJSON(w, &FromErrors{
+				Errors: map[string]*Error{
+					"username": &Error{
+						Code:        1,
+						Message:     "Username already used!",
+						Description: errorStr,
+					},
+				},
+			})
 			return
 		}
-
-		if dbc := h.DBConn.Create(user); dbc.Error != nil {
-			errorStr := dbc.Error.Error()
-			log.Errorf("database create error: %s", errorStr)
-
-			//TODO: спрятать это в либу
-			if strings.Index(errorStr, "uniq_username") != -1 {
-				errors.Errors["username"] = &Error{
-					Code:        1,
-					Message:     "Username already used!",
-					Description: errorStr,
-				}
-				writeFormErrorsJSON(w, &errors)
-				return
-			}
-		}
-
-		log.Noticef("user %s created", user.Username)
 	}
 
-	writeFormErrorsJSON(w, &errors)
+	log.Noticef("user %s created", user.Username)
+	writeApplicationJSON(w, &FromErrors{})
 }
 
 func main() {

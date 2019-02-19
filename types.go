@@ -41,25 +41,30 @@ func (u *FormUser) TableName() string {
 
 // Validate валидация структуры,
 // TODO: убрать в либу
-func (u *FormUser) Validate(errors map[string]*Error) bool {
-	wasError := true
+func (u *FormUser) Validate() (*FromErrors, bool) {
 	if u.Username == "" {
-		errors["username"] = &Error{
-			Code:    2,
-			Message: "Username is empty",
-		}
-		wasError = false
+		return &FromErrors{
+			Errors: map[string]*Error{
+				"username": {
+					Code:    2,
+					Message: "Username is empty",
+				},
+			},
+		}, false
 	}
 
 	if u.PasswordRaw == "" {
-		errors["password"] = &Error{
-			Code:    2,
-			Message: "Password is empty",
-		}
-		wasError = false
+		return &FromErrors{
+			Errors: map[string]*Error{
+				"password": {
+					Code:    2,
+					Message: "Password is empty",
+				},
+			},
+		}, false
 	}
 
-	return wasError
+	return nil, true
 }
 
 // User структура для gorm
@@ -86,5 +91,6 @@ type Error struct {
 // FromErrors ошибки в форме:
 // (поле, ошибка)
 type FromErrors struct {
-	Errors map[string]*Error `json:"errors"`
+	Other  []*Error          `json:"other,omitempty"`
+	Errors map[string]*Error `json:"errors,omitempty"`
 }

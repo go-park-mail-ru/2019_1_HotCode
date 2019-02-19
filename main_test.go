@@ -89,7 +89,7 @@ func TestSignUpUser(t *testing.T) {
 		{ //Всё ок
 			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{}}`,
+			ExpectedBody: `{}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
 			Handler:      h.SignUpUser,
@@ -146,7 +146,7 @@ func TestCheckUsername(t *testing.T) {
 		{ // Создадим юзера
 			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{}}`,
+			ExpectedBody: `{}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
 			Handler:      h.SignUpUser,
@@ -187,7 +187,7 @@ func TestSignInUser(t *testing.T) {
 		{ //Такого юзера пока нет
 			Payload:      []byte(`{"username":"kek","password":"lol"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{"other":{"code":3,"message":"Wrong username or password","description":"Record Not Found"}}}`,
+			ExpectedBody: `{"other":[{"code":3,"message":"Wrong username or password","description":"Record Not Found"}]}`,
 			Method:       "POST",
 			Endpoint:     "/signin",
 			Handler:      h.SignInUser,
@@ -195,7 +195,7 @@ func TestSignInUser(t *testing.T) {
 		{ // Создадим юзера
 			Payload:      []byte(`{"username":"kek","password":"lol"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{}}`,
+			ExpectedBody: `{}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
 			Handler:      h.SignUpUser,
@@ -203,7 +203,7 @@ func TestSignInUser(t *testing.T) {
 		{ // Теперь юзер логинится
 			Payload:      []byte(`{"username":"kek","password":"lol"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{}}`,
+			ExpectedBody: `{"username":"kek","id":1,"active":true}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
 			Handler:      h.SignInUser,
