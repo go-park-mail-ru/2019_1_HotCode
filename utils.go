@@ -33,3 +33,10 @@ func decodeBodyJSON(body io.Reader, v interface{}) error {
 
 	return nil
 }
+
+func userInfo(r *http.Request) *InfoUser {
+	if rv := r.Context().Value(userInfoKey); rv != nil {
+		return rv.(*InfoUser)
+	}
+	return nil
+}

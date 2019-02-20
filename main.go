@@ -96,6 +96,7 @@ func (h *Handler) CheckUsername(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
+	//вот это всё уложить в либу
 	userInfo := &InfoUser{}
 	if dbc := h.DBConn.First(userInfo, "id = ?", vars["userID"]); dbc.RecordNotFound() ||
 		!userInfo.Active {
@@ -120,6 +121,118 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	writeApplicationJSON(w, userInfo)
 	log.Noticef("user %s was found", vars["userID"])
+}
+
+// UpdateUser updates user info by ID
+func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	info := userInfo(r)
+
+	if vars["userID"] != strconv.Itoa(int(info.ID)) {
+		writeFatalError(w, http.StatusForbidden,
+			fmt.Sprintf("%s tried to change %d", vars["userID"], info.ID),
+			"you don't have permission to this page")
+		return
+	}
+
+	updateForm := &struct {
+		BasicUser
+		OldPassword string `json:"oldPassword"`
+		NewPassword string `json:"newPassword"`
+	}{}
+	err := decodeBodyJSON(r.Body, updateForm)
+	if err != nil {
+		writeFatalError(w, http.StatusBadRequest,
+			fmt.Sprintf("unable to decode request body; err: %s", err.Error()),
+			"incorrect json")
+		return
+	}
+
+	// нечего обновлять
+	if updateForm.Username == "" && updateForm.NewPassword == "" {
+		writeApplicationJSON(w, &FromErrors{})
+		return
+	}
+
+	//вот это всё уложить в либу
+	storedUser := &User{}
+	if dbc := h.DBConn.First(storedUser, "id = ?", vars["userID"]); dbc.RecordNotFound() ||
+		!storedUser.Active {
+		log.Warningf("user %s not found", vars["userID"])
+		writeApplicationJSON(w, &FromErrors{
+			Errors: map[string]*Error{
+				"userID": &Error{
+					Code:        5,
+					Message:     "User was not created or deleted",
+					Description: "Record not found or active false",
+				},
+			},
+		})
+		return
+	} else if dbc.Error != nil {
+		// ошибка в базе
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("database first error: %s", dbc.Error.Error()),
+			"internal server error")
+		return
+	}
+
+	if updateForm.Username != "" {
+		storedUser.Username = updateForm.Username
+	}
+
+	if updateForm.NewPassword != "" {
+		if err := bcrypt.CompareHashAndPassword(storedUser.PasswordEncoded, []byte(updateForm.OldPassword)); err != nil {
+			log.Warningf("user: %s wrong password", storedUser.Username)
+			writeApplicationJSON(w, &FromErrors{
+				Other: []*Error{
+					&Error{
+						Code:        3,
+						Message:     "Wrong password",
+						Description: "Record Not Found",
+					},
+				},
+			})
+			return
+		}
+
+		newPass, err := bcrypt.GenerateFromPassword([]byte(updateForm.NewPassword), bcrypt.MinCost)
+		if err != nil {
+			writeFatalError(w, http.StatusInternalServerError,
+				fmt.Sprintf("bcrypt hash error: %s", err.Error()),
+				"internal server error")
+			return
+		}
+
+		storedUser.PasswordEncoded = newPass
+	}
+
+	if dbc := h.DBConn.Save(storedUser); dbc.Error != nil {
+		errorStr := dbc.Error.Error()
+		log.Errorf("database create error: %s", errorStr)
+
+		//TODO: спрятать это в либу
+		if strings.Index(errorStr, "uniq_username") != -1 {
+			writeApplicationJSON(w, &FromErrors{
+				Errors: map[string]*Error{
+					"username": &Error{
+						Code:        1,
+						Message:     "Username already used!",
+						Description: errorStr,
+					},
+				},
+			})
+			return
+		}
+
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("database create error: %s", errorStr),
+			"internal server error")
+		return
+	}
+
+	log.Noticef("user %d updated;", info.ID)
+	writeApplicationJSON(w, &FromErrors{})
 }
 
 // SignInUser signs in and returns the authentication cookie
@@ -305,6 +418,11 @@ func (h *Handler) SignUpUser(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("database create error: %s", errorStr),
+			"internal server error")
+		return
 	}
 
 	log.Noticef("user %s created", user.Username)
@@ -354,6 +472,7 @@ func main() {
 	r.HandleFunc("/signout", WithAuthentication(h.SignOutUser, h)).Methods("POST")
 	r.HandleFunc("/users/username_check", h.CheckUsername).Methods("POST")
 	r.HandleFunc("/users/{userID:[0-9]+}", h.GetUser).Methods("GET")
+	r.HandleFunc("/users/{userID:[0-9]+}", WithAuthentication(h.UpdateUser, h)).Methods("POST")
 	//r.HandleFunc("/users/{userID:[0-9]+}/delete", //temproraty deprecated
 	//	WithAuthentication(h.DeleteUser, h)).Methods("POST")
 
