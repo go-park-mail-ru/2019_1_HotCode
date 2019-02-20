@@ -12,7 +12,7 @@ func writeFatalError(w http.ResponseWriter, statusCode int, logStr, respStr stri
 	http.Error(w, respStr, statusCode)
 }
 
-func writeApplicationJSON(w http.ResponseWriter, v interface{}) error {
+func writeApplicationJSON(w http.ResponseWriter, v interface{}) {
 	respJSON, err := json.Marshal(v)
 	if err != nil {
 		writeFatalError(w, http.StatusInternalServerError,
@@ -22,7 +22,6 @@ func writeApplicationJSON(w http.ResponseWriter, v interface{}) error {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(respJSON)
-	return nil
 }
 
 func decodeBodyJSON(body io.Reader, v interface{}) error {

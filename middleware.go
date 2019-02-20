@@ -18,3 +18,26 @@ func AccessLogMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// WithAuthentication проверка токена перед исполнением запроса
+func WithAuthentication(next http.HandlerFunc, h *Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("JSESSIONID")
+		if err != nil {
+			log.Warningf("[%s] %s %s; AUTH FAILED; No cookie",
+				r.Method, r.RemoteAddr, r.URL.Path)
+			http.Error(w, "wrong token", http.StatusUnauthorized)
+			return
+		}
+		info, err := h.CheckToken(cookie.Value)
+		if err != nil {
+			log.Warningf("[%s] %s %s; AUTH FAILED; JSESSIONID: %s",
+				r.Method, r.RemoteAddr, r.URL.Path, cookie.Value)
+			http.Error(w, "wrong token", http.StatusUnauthorized)
+			return
+		}
+
+		log.Noticef("username %s; session %s; check ok", info.Username, cookie.Value)
+		next.ServeHTTP(w, r)
+	})
+}

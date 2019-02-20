@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,11 +67,22 @@ func initHandler() Handler {
 	}
 }
 
+func makeRequest(method, endpoint string, cookies []*http.Cookie,
+	body io.Reader, handle http.HandlerFunc) *httptest.ResponseRecorder {
+	req, _ := http.NewRequest(method, endpoint, body)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	resp := httptest.NewRecorder()
+	handle(resp, req)
+	return resp
+}
+
 func runTableAPITests(t *testing.T, cases []*Case) {
 	for i, c := range cases {
-		req, _ := http.NewRequest(c.Method, fmt.Sprintf(c.Endpoint, c.Params...), bytes.NewBuffer(c.Payload))
-		resp := httptest.NewRecorder()
-		c.Handler(resp, req)
+		resp := makeRequest(c.Method, fmt.Sprintf(c.Endpoint, c.Params...),
+			nil, bytes.NewBuffer(c.Payload), c.Handler)
 
 		if resp.Code != c.ExpectedCode {
 			t.Fatalf("\n[%d] Expected response code %d Got %d\n", i, c.ExpectedCode, resp.Code)
@@ -205,7 +217,7 @@ func TestSignInUser(t *testing.T) {
 			ExpectedCode: 200,
 			ExpectedBody: `{"username":"kek","id":1,"active":true}`,
 			Method:       "POST",
-			Endpoint:     "/signup",
+			Endpoint:     "/signin",
 			Handler:      h.SignInUser,
 		},
 		{ // Пустой никнейм нельзя
@@ -213,7 +225,7 @@ func TestSignInUser(t *testing.T) {
 			ExpectedCode: 200,
 			ExpectedBody: `{"errors":{"username":{"code":2,"message":"Username is empty","description":""}}}`,
 			Method:       "POST",
-			Endpoint:     "/signup",
+			Endpoint:     "/signin",
 			Handler:      h.SignInUser,
 		},
 		{ // Пустой пароль тоже нельзя
@@ -221,7 +233,7 @@ func TestSignInUser(t *testing.T) {
 			ExpectedCode: 200,
 			ExpectedBody: `{"errors":{"password":{"code":2,"message":"Password is empty","description":""}}}`,
 			Method:       "POST",
-			Endpoint:     "/signup",
+			Endpoint:     "/signin",
 			Handler:      h.SignInUser,
 		},
 		{ // Неправильный формат JSON
@@ -229,7 +241,7 @@ func TestSignInUser(t *testing.T) {
 			ExpectedCode: 400,
 			ExpectedBody: "incorrect json\n",
 			Method:       "POST",
-			Endpoint:     "/signup",
+			Endpoint:     "/signin",
 			Handler:      h.SignInUser,
 		},
 	}

@@ -68,7 +68,6 @@ func (h *Handler) CheckToken(sessionToken string) (*InfoUser, error) {
 		return nil, err
 	}
 
-	log.Noticef("username %s; session %s; check ok", userInfo.Username, sessionToken)
 	return userInfo, nil
 }
 
@@ -84,19 +83,13 @@ func (h *Handler) CheckUsername(w http.ResponseWriter, r *http.Request) {
 	}
 
 	used := !h.DBConn.First(&BasicUser{}, "username = ?", username.Username).RecordNotFound()
-	err = writeApplicationJSON(w, &struct {
+	writeApplicationJSON(w, &struct {
 		Used bool `json:"used"`
 	}{
 		Used: used,
 	})
-	if err != nil {
-		writeFatalError(w, http.StatusInternalServerError,
-			fmt.Sprintf("result marshal error: %s", err.Error()),
-			"internal server error")
-		return
-	}
 
-	log.Noticef("username %s check ok", username.Username)
+	log.Noticef("username %s check ok; USED: %t", username.Username, used)
 }
 
 // SignInUser signs in and returns the authentication cookie
@@ -111,6 +104,7 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errs, ok := user.Validate(); !ok {
+		log.Warning("user form validation failed")
 		writeApplicationJSON(w, errs)
 		return
 	}
@@ -119,7 +113,7 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 	// ищем юзера с таким именем
 	if dbc := h.DBConn.First(storedUser, "username = ?", user.Username); dbc.RecordNotFound() {
 		// не нашли
-		log.Errorf("user not found: %s", dbc.Error.Error())
+		log.Warningf("user not found: %s", dbc.Error.Error())
 		writeApplicationJSON(w, &FromErrors{
 			Other: []*Error{
 				&Error{
@@ -140,7 +134,7 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 
 	// проверяем пароли
 	if err := bcrypt.CompareHashAndPassword(storedUser.PasswordEncoded, []byte(user.PasswordRaw)); err != nil {
-		log.Errorf("user: %s wrong password", user.Username)
+		log.Warningf("user: %s wrong password", user.Username)
 		writeApplicationJSON(w, &FromErrors{
 			Other: []*Error{
 				&Error{
@@ -175,7 +169,7 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// на 30 суток
+	// на 30 суток(убрать в либу)
 	_, err = h.SessionStoreConn.Do("SETEX", sessionToken.String(), "2628000", sessionInfo)
 	if err != nil {
 		writeFatalError(w, http.StatusInternalServerError,
@@ -196,6 +190,31 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 	w.Write(sessionInfo)
 }
 
+// SignOutUser signs out and deletes the authentication cookie
+func (h *Handler) SignOutUser(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("JSESSIONID")
+	if err != nil {
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("cant get cookie; err: %s", err.Error()),
+			"internal server error")
+		return
+	}
+
+	//убрать в либу
+	_, err = h.SessionStoreConn.Do("DEL", cookie.Value)
+	if err != nil {
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("cant delete cookie; err: %s", err.Error()),
+			"internal server error")
+		return
+	}
+
+	cookie.Expires = time.Unix(0, 0)
+	http.SetCookie(w, cookie)
+
+	log.Noticef("token %s removed", cookie.Value)
+}
+
 // SignUpUser creates new user
 func (h *Handler) SignUpUser(w http.ResponseWriter, r *http.Request) {
 	user := &FormUser{}
@@ -208,6 +227,7 @@ func (h *Handler) SignUpUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errs, ok := user.Validate(); !ok {
+		log.Warning("user form validation failed")
 		writeApplicationJSON(w, errs)
 		return
 	}
@@ -283,6 +303,7 @@ func main() {
 	r.HandleFunc("/", h.Index).Methods("GET")
 	r.HandleFunc("/signup", h.SignUpUser).Methods("POST")
 	r.HandleFunc("/signin", h.SignInUser).Methods("POST")
+	r.HandleFunc("/signout", WithAuthentication(h.SignOutUser, h)).Methods("POST")
 	r.HandleFunc("/users/username_check", h.CheckUsername).Methods("POST")
 
 	h.Router = AccessLogMiddleware(r)
