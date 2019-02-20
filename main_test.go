@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -44,7 +43,6 @@ type Case struct {
 	ExpectedBody string
 	Method       string
 	Endpoint     string
-	Params       []interface{}
 	Handler      http.HandlerFunc
 }
 
@@ -81,7 +79,7 @@ func makeRequest(method, endpoint string, cookies []*http.Cookie,
 
 func runTableAPITests(t *testing.T, cases []*Case) {
 	for i, c := range cases {
-		resp := makeRequest(c.Method, fmt.Sprintf(c.Endpoint, c.Params...),
+		resp := makeRequest(c.Method, c.Endpoint,
 			nil, bytes.NewBuffer(c.Payload), c.Handler)
 
 		if resp.Code != c.ExpectedCode {

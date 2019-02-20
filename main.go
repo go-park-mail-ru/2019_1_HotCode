@@ -92,6 +92,36 @@ func (h *Handler) CheckUsername(w http.ResponseWriter, r *http.Request) {
 	log.Noticef("username %s check ok; USED: %t", username.Username, used)
 }
 
+// GetUser get user info by ID
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	userInfo := &InfoUser{}
+	if dbc := h.DBConn.First(userInfo, "id = ?", vars["userID"]); dbc.RecordNotFound() ||
+		!userInfo.Active {
+		log.Warningf("user %s not found", vars["userID"])
+		writeApplicationJSON(w, &FromErrors{
+			Errors: map[string]*Error{
+				"userID": &Error{
+					Code:        5,
+					Message:     "User was not created or deleted",
+					Description: "Record not found or active false",
+				},
+			},
+		})
+		return
+	} else if dbc.Error != nil {
+		// ошибка в базе
+		writeFatalError(w, http.StatusInternalServerError,
+			fmt.Sprintf("database first error: %s", dbc.Error.Error()),
+			"internal server error")
+		return
+	}
+
+	writeApplicationJSON(w, userInfo)
+	log.Noticef("user %s was found", vars["userID"])
+}
+
 // SignInUser signs in and returns the authentication cookie
 func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 	user := &FormUser{}
@@ -109,11 +139,12 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//тоже уйдёт в либу
 	storedUser := &User{}
 	// ищем юзера с таким именем
 	if dbc := h.DBConn.First(storedUser, "username = ?", user.Username); dbc.RecordNotFound() {
-		// не нашли
-		log.Warningf("user not found: %s", dbc.Error.Error())
+		// не нашли или удалён
+		log.Warning("user not found")
 		writeApplicationJSON(w, &FromErrors{
 			Other: []*Error{
 				&Error{
@@ -129,6 +160,20 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		writeFatalError(w, http.StatusInternalServerError,
 			fmt.Sprintf("database first error: %s", dbc.Error.Error()),
 			"internal server error")
+		return
+	}
+
+	if !storedUser.Active {
+		log.Warning("user was deleted recently")
+		writeApplicationJSON(w, &FromErrors{
+			Other: []*Error{
+				&Error{
+					Code:        4,
+					Message:     "User was deleted recently",
+					Description: "Active is false",
+				},
+			},
+		})
 		return
 	}
 
@@ -185,9 +230,11 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		Expires: time.Now().Add(2628000 * time.Second),
 	})
 
-	log.Noticef("username %s signin ok", storedUser.Username)
+	//уже есть готовая последовательность байт
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(sessionInfo)
+
+	log.Noticef("username %s signin ok", storedUser.Username)
 }
 
 // SignOutUser signs out and deletes the authentication cookie
@@ -213,6 +260,7 @@ func (h *Handler) SignOutUser(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, cookie)
 
 	log.Noticef("token %s removed", cookie.Value)
+	writeApplicationJSON(w, &FromErrors{})
 }
 
 // SignUpUser creates new user
@@ -305,6 +353,9 @@ func main() {
 	r.HandleFunc("/signin", h.SignInUser).Methods("POST")
 	r.HandleFunc("/signout", WithAuthentication(h.SignOutUser, h)).Methods("POST")
 	r.HandleFunc("/users/username_check", h.CheckUsername).Methods("POST")
+	r.HandleFunc("/users/{userID:[0-9]+}", h.GetUser).Methods("GET")
+	//r.HandleFunc("/users/{userID:[0-9]+}/delete", //temproraty deprecated
+	//	WithAuthentication(h.DeleteUser, h)).Methods("POST")
 
 	h.Router = AccessLogMiddleware(r)
 	log.Noticef("MainService successfully started at port %d", configuration.Port)
