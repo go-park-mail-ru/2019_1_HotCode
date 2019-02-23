@@ -1,14 +1,16 @@
 package main
 
 import (
+	"2019_1_HotCode/apptypes"
+	"2019_1_HotCode/dblib"
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/jinzhu/gorm"
 )
 
 const (
@@ -47,20 +49,15 @@ type Case struct {
 }
 
 func initHandler() Handler {
-	//setting db connection
-	//TODO: move it to lib
-	db, _ := gorm.Open("postgres", psqlTestStr)
-	db.LogMode(false)
-
-	// Drop user table
-	db.Exec(reloadTableSQL)
+	//setting db connection & Drop user table
+	dblib.ConnectDB("warscript_test_user", "qwerty", "localhost", "warscript_test_db")
+	dblib.GetDB().Exec(reloadTableSQL)
 
 	sessionsRedisConn, _ := redis.DialURL(redisTestStr)
-
 	sessionsRedisConn.Do("FLUSHDB")
 
 	return Handler{
-		DBConn:           db,
+		DBConn:           dblib.GetDB(),
 		SessionStoreConn: sessionsRedisConn,
 	}
 }
@@ -107,7 +104,7 @@ func TestSignUpUser(t *testing.T) {
 		{ // На используемый username
 			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{"username":{"code":1,"message":"Username already used!","description":"pq: duplicate key value violates unique constraint \"uniq_username\""}}}`,
+			ExpectedBody: fmt.Sprintf(`{"fields":{"username":{"code":%d,"message":"","description":"pq: duplicate key value violates unique constraint \"uniq_username\""}}}`, apptypes.AlreadyUsed),
 			Method:       "POST",
 			Endpoint:     "/signup",
 			Handler:      h.SignUpUser,
@@ -115,15 +112,15 @@ func TestSignUpUser(t *testing.T) {
 		{ // Пустой юзернейм
 			Payload:      []byte(`{"username":"","password":"dsadasd"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{"username":{"code":2,"message":"Username is empty","description":""}}}`,
+			ExpectedBody: fmt.Sprintf(`{"fields":{"username":{"code":%d,"message":"","description":"Username is empty"}}}`, apptypes.FailedToValidate),
 			Method:       "POST",
 			Endpoint:     "/signup",
 			Handler:      h.SignUpUser,
 		},
-		{ // Пустой пароль
+		{ // Пустой пароль нас не смущает
 			Payload:      []byte(`{"username":"kek","password":""}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{"password":{"code":2,"message":"Password is empty","description":""}}}`,
+			ExpectedBody: `{}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
 			Handler:      h.SignUpUser,
@@ -197,7 +194,7 @@ func TestSignInUser(t *testing.T) {
 		{ //Такого юзера пока нет
 			Payload:      []byte(`{"username":"kek","password":"lol"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"other":[{"code":3,"message":"Wrong username or password","description":"Record Not Found"}]}`,
+			ExpectedBody: fmt.Sprintf(`{"other":{"code":%d,"message":"","description":"Can't find user with given parameters"}}`, apptypes.RowNotFound),
 			Method:       "POST",
 			Endpoint:     "/signin",
 			Handler:      h.SignInUser,
@@ -221,15 +218,7 @@ func TestSignInUser(t *testing.T) {
 		{ // Пустой никнейм нельзя
 			Payload:      []byte(`{"username":"", "password":"lol"}`),
 			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{"username":{"code":2,"message":"Username is empty","description":""}}}`,
-			Method:       "POST",
-			Endpoint:     "/signin",
-			Handler:      h.SignInUser,
-		},
-		{ // Пустой пароль тоже нельзя
-			Payload:      []byte(`{"username":"kek", "password":""}`),
-			ExpectedCode: 200,
-			ExpectedBody: `{"errors":{"password":{"code":2,"message":"Password is empty","description":""}}}`,
+			ExpectedBody: fmt.Sprintf(`{"other":{"code":%d,"message":"","description":"Can't find user with given parameters"}}`, apptypes.RowNotFound),
 			Method:       "POST",
 			Endpoint:     "/signin",
 			Handler:      h.SignInUser,

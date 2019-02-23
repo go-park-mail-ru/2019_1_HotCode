@@ -1,7 +1,7 @@
 package dblib
 
 import (
-	errCodes "Techno/2019_1_HotCode/errors"
+	"2019_1_HotCode/apptypes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -28,16 +28,18 @@ create unique index user_username_uindex
 )
 
 func initDB() {
+	ConnectDB("warscript_test_user", "qwerty",
+		"localhost", "warscript_test_db")
 	GetDB().Exec(reloadTableSQL)
 }
 
-func FormErrorsToString(fe *FormErrors) string {
+func FormErrorsToString(fe *apptypes.Errors) string {
 	if fe == nil {
 		return "	nil\n"
 	}
 	var sb strings.Builder
 	sb.WriteString("	Errors:\n")
-	for name, err := range fe.Errors {
+	for name, err := range fe.Fields {
 		sb.WriteString(fmt.Sprintf(`		"%s":{
 		Code: %d
 		Descr: %s
@@ -46,20 +48,19 @@ func FormErrorsToString(fe *FormErrors) string {
 `, name, err.Code, err.Description, err.Message))
 	}
 	sb.WriteString("	Other:\n")
-	for _, err := range fe.Other {
-		sb.WriteString(fmt.Sprintf(`
+	sb.WriteString(fmt.Sprintf(`
 		Code: %d
 		Descr: %s
 		Msg: %s
-`, err.Code, err.Description, err.Message))
-	}
+`, fe.Other.Code, fe.Other.Description, fe.Other.Message))
+
 	return sb.String()
 }
 
 //Create Save Validate User Case
 type CSVUserCase struct {
 	u    *User
-	resp *FormErrors
+	resp *apptypes.Errors
 }
 
 func TestUserCreate(t *testing.T) {
@@ -83,10 +84,10 @@ func TestUserCreate(t *testing.T) {
 				Username: "test_user",
 				Password: []byte("secure_password"),
 			},
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"username": &Error{
-						Code:        errCodes.AlreadyUsed,
+			resp: &apptypes.Errors{
+				Fields: map[string]*apptypes.Error{
+					"username": &apptypes.Error{
+						Code:        apptypes.AlreadyUsed,
 						Description: `pq: duplicate key value violates unique constraint "uniq_username"`,
 					},
 				},
@@ -102,10 +103,10 @@ func TestUserCreate(t *testing.T) {
 		//4
 		&CSVUserCase{
 			u: user,
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"id": &Error{
-						Code:        errCodes.CantCreate,
+			resp: &apptypes.Errors{
+				Fields: map[string]*apptypes.Error{
+					"id": &apptypes.Error{
+						Code:        apptypes.CantCreate,
 						Description: `User cant be formed, maybe try Update?`,
 					},
 				},
@@ -144,10 +145,10 @@ func TestUserSave(t *testing.T) {
 		//2
 		&CSVUserCase{
 			u: user2,
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"username": &Error{
-						Code:        errCodes.AlreadyUsed,
+			resp: &apptypes.Errors{
+				Fields: map[string]*apptypes.Error{
+					"username": &apptypes.Error{
+						Code:        apptypes.AlreadyUsed,
 						Description: `pq: duplicate key value violates unique constraint "uniq_username"`,
 					},
 				},
@@ -160,10 +161,10 @@ func TestUserSave(t *testing.T) {
 				Username: "test_user",
 				Password: []byte("secure_password"),
 			},
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"id": &Error{
-						Code:        errCodes.CantSave,
+			resp: &apptypes.Errors{
+				Fields: map[string]*apptypes.Error{
+					"id": &apptypes.Error{
+						Code:        apptypes.CantSave,
 						Description: `User doesn't exist, maybe try Create?`,
 					},
 				},
@@ -196,10 +197,10 @@ func TestUserValidate(t *testing.T) {
 				Username: "",
 				Password: []byte("has"),
 			},
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"username": &Error{
-						Code:        errCodes.FailedToValidate,
+			resp: &apptypes.Errors{
+				Fields: map[string]*apptypes.Error{
+					"username": &apptypes.Error{
+						Code:        apptypes.FailedToValidate,
 						Description: "Username is empty",
 					},
 				},
@@ -212,10 +213,10 @@ func TestUserValidate(t *testing.T) {
 				Username: "has",
 				Password: []byte(""),
 			},
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"password": &Error{
-						Code:        errCodes.FailedToValidate,
+			resp: &apptypes.Errors{
+				Fields: map[string]*apptypes.Error{
+					"password": &apptypes.Error{
+						Code:        apptypes.FailedToValidate,
 						Description: `Password is empty`,
 					},
 				},
@@ -228,14 +229,14 @@ func TestUserValidate(t *testing.T) {
 				Username: "",
 				Password: []byte(""),
 			},
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"password": &Error{
-						Code:        errCodes.FailedToValidate,
+			resp: &apptypes.Errors{
+				Fields: map[string]*apptypes.Error{
+					"password": &apptypes.Error{
+						Code:        apptypes.FailedToValidate,
 						Description: `Password is empty`,
 					},
-					"username": &Error{
-						Code:        errCodes.FailedToValidate,
+					"username": &apptypes.Error{
+						Code:        apptypes.FailedToValidate,
 						Description: "Username is empty",
 					},
 				},
@@ -253,7 +254,7 @@ func TestUserValidate(t *testing.T) {
 type GetUserCase struct {
 	params map[string]interface{}
 	u      *User
-	resp   *FormErrors
+	resp   *apptypes.Errors
 }
 
 func TestUserGet(t *testing.T) {
@@ -275,12 +276,10 @@ func TestUserGet(t *testing.T) {
 				"username": "not_exist",
 			},
 			u: nil,
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"pattern_mismatch": {
-						Code:        errCodes.RowNotFound,
-						Description: "Can't find user with given parameters",
-					},
+			resp: &apptypes.Errors{
+				Other: &apptypes.Error{
+					Code:        apptypes.RowNotFound,
+					Description: "Can't find user with given parameters",
 				},
 			},
 		},
@@ -309,12 +308,10 @@ func TestUserGet(t *testing.T) {
 				"speed": "500",
 			},
 			u: nil,
-			resp: &FormErrors{
-				Errors: map[string]*Error{
-					"pattern_mismatch": {
-						Code:        errCodes.RowNotFound,
-						Description: "Can't find user with given parameters",
-					},
+			resp: &apptypes.Errors{
+				Other: &apptypes.Error{
+					Code:        apptypes.RowNotFound,
+					Description: "Can't find user with given parameters",
 				},
 			},
 		},

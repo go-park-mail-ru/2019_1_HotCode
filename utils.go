@@ -1,6 +1,7 @@
 package main
 
 import (
+	"2019_1_HotCode/apptypes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,9 +35,9 @@ func decodeBodyJSON(body io.Reader, v interface{}) error {
 	return nil
 }
 
-func userInfo(r *http.Request) *InfoUser {
-	if rv := r.Context().Value(userInfoKey); rv != nil {
-		return rv.(*InfoUser)
+func userInfo(r *http.Request) *apptypes.InfoUser {
+	if rv := r.Context().Value(apptypes.UserInfoKey); rv != nil {
+		return rv.(*apptypes.InfoUser)
 	}
 	return nil
 }

@@ -1,17 +1,12 @@
 package main
 
 import (
+	"2019_1_HotCode/apptypes"
 	"context"
 	"net/http"
 	"os"
 
 	"github.com/op/go-logging"
-)
-
-type contextKey int
-
-const (
-	userInfoKey contextKey = 1
 )
 
 // AccessLogMiddleware логирование всех запросов
@@ -45,7 +40,7 @@ func WithAuthentication(next http.HandlerFunc, h *Handler) http.HandlerFunc {
 		}
 
 		log.Noticef("username %s; session %s; check ok", info.Username, cookie.Value)
-		ctx := context.WithValue(r.Context(), userInfoKey, info)
+		ctx := context.WithValue(r.Context(), apptypes.UserInfoKey, info)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
