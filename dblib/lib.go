@@ -3,6 +3,10 @@ package dblib
 import (
 	"log"
 	"strings"
+	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/pkg/errors"
 
 	errCodes "Techno/2019_1_HotCode/errors"
 
@@ -10,22 +14,31 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type configuration struct {
-	DBUser     string `env:"db_user"`
-	DBPassword string `env:"db_password"`
-	DBHost     string `env:"db_host"`
-	DBName     string `env:"db_name"`
-}
+const (
+	//DSN настройки соединения
+	psqlStr = "postgres://ws_user:1234@localhost/warscript_lib_db"
+
+	// docker run -d -p 6379:6379 redis
+	// docker kill $$(docker ps -q)
+	// docker rm $$(docker ps -a -q)
+	redisDSN = "redis://user:@localhost:6379/0"
+)
 
 var db *gorm.DB
+var storage redis.Conn
 
 func init() {
 	var err error
-	db, err = gorm.Open("postgres", "postgres://ws_user:1234@localhost/warscript_lib_db")
+	db, err = gorm.Open("postgres", psqlStr)
 	if err != nil {
 		log.Fatalf("failed to connect to db; err: %s", err.Error())
 	}
 	db.LogMode(false)
+
+	storage, err = redis.DialURL(redisDSN)
+	if err != nil {
+		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
+	}
 }
 
 // Error структура ошибки
@@ -45,6 +58,11 @@ type FormErrors struct {
 //GetDB returns initiated database
 func GetDB() *gorm.DB {
 	return db
+}
+
+//GetStorage returns initiated storage
+func GetStorage() redis.Conn{
+	return storage
 }
 
 //User model for users table
@@ -178,4 +196,22 @@ func GetUser(params map[string]interface{}) (u *User, err *FormErrors) {
 		}
 	}
 	return u, nil
+}
+
+//StorageSet sets key-value in storage
+func StorageSet(key string, value []byte, t time.Duration) error {
+	_, err := storage.Do("SETEX", key, int(t.Seconds()), value)
+	return errors.WithMessage(err, "failed to save value")
+}
+
+//StorageGet gets value by key
+func StorageGet(key string) ([]byte, error) {
+	str, err := redis.Bytes(storage.Do("GET", key))
+	return str, errors.WithMessage(err, "failed to get value")
+}
+
+//StorageDel deletes value from storage
+func StorageDel(key string) error {
+	_, err := storage.Do("DEL", key)
+	return errors.WithMessage(err, "failed to delete value")
 }
