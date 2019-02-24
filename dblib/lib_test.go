@@ -1,17 +1,11 @@
 package dblib
 
 import (
-<<<<<<< HEAD
 	"2019_1_HotCode/apptypes"
-=======
-	errCodes "Techno/2019_1_HotCode/errors"
-	"errors"
->>>>>>> f7d6d7f1aca1f8608e5f353094286626ac23f23f
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
 const (
@@ -36,6 +30,7 @@ create unique index user_username_uindex
 func initDB() {
 	ConnectDB("warscript_test_user", "qwerty",
 		"localhost", "warscript_test_db")
+	ConnectStorage("user", "", "localhost", 6380)
 	GetDB().Exec(reloadTableSQL)
 	GetStorage().Do("FLUSHDB")
 }
@@ -330,115 +325,115 @@ func TestUserGet(t *testing.T) {
 	}
 }
 
-//Save Get Del Storage Case
-type SGDStorageCase struct {
-	k        string
-	v        []byte
-	t        time.Duration
-	method   interface{}
-	response SGDStorageCaseResp
-}
+// //Save Get Del Storage Case
+// type SGDStorageCase struct {
+// 	k        string
+// 	v        []byte
+// 	t        time.Duration
+// 	method   interface{}
+// 	response SGDStorageCaseResp
+// }
 
-type SGDStorageCaseResp struct {
-	v   []byte
-	err error
-}
+// type SGDStorageCaseResp struct {
+// 	v   []byte
+// 	err error
+// }
 
-func errEq(e1 error, e2 error) bool {
-	return (e1 == nil && e2 == nil) ||
-		(e1 != nil && e2 != nil && e1.Error() == e2.Error())
-}
+// func errEq(e1 error, e2 error) bool {
+// 	return (e1 == nil && e2 == nil) ||
+// 		(e1 != nil && e2 != nil && e1.Error() == e2.Error())
+// }
 
-func TestStorageSGD(t *testing.T) {
-	cases := []SGDStorageCase{
-		//1
-		SGDStorageCase{
-			k:      "key",
-			v:      []byte("value"),
-			t:      1000 * time.Second,
-			method: "SET",
-			response: SGDStorageCaseResp{
-				err: nil,
-			},
-		},
+// func TestStorageSGD(t *testing.T) {
+// 	cases := []SGDStorageCase{
+// 		//1
+// 		SGDStorageCase{
+// 			k:      "key",
+// 			v:      []byte("value"),
+// 			t:      1000 * time.Second,
+// 			method: "SET",
+// 			response: SGDStorageCaseResp{
+// 				err: nil,
+// 			},
+// 		},
 
-		//2
-		SGDStorageCase{
-			k:      "key",
-			method: "GET",
-			response: SGDStorageCaseResp{
-				err: nil,
-				v:   []byte("value"),
-			},
-		},
+// 		//2
+// 		SGDStorageCase{
+// 			k:      "key",
+// 			method: "GET",
+// 			response: SGDStorageCaseResp{
+// 				err: nil,
+// 				v:   []byte("value"),
+// 			},
+// 		},
 
-		//3
-		SGDStorageCase{
-			k:      "key",
-			v:      []byte("another value"),
-			t:      1000 * time.Second,
-			method: "SET",
-			response: SGDStorageCaseResp{
-				err: nil,
-			},
-		},
+// 		//3
+// 		SGDStorageCase{
+// 			k:      "key",
+// 			v:      []byte("another value"),
+// 			t:      1000 * time.Second,
+// 			method: "SET",
+// 			response: SGDStorageCaseResp{
+// 				err: nil,
+// 			},
+// 		},
 
-		//4
-		SGDStorageCase{
-			k:      "key",
-			method: "GET",
-			response: SGDStorageCaseResp{
-				err: nil,
-				v:   []byte("another value"),
-			},
-		},
+// 		//4
+// 		SGDStorageCase{
+// 			k:      "key",
+// 			method: "GET",
+// 			response: SGDStorageCaseResp{
+// 				err: nil,
+// 				v:   []byte("another value"),
+// 			},
+// 		},
 
-		//5
-		SGDStorageCase{
-			k:      "key",
-			method: "DEL",
-			response: SGDStorageCaseResp{
-				err: nil,
-			},
-		},
+// 		//5
+// 		SGDStorageCase{
+// 			k:      "key",
+// 			method: "DEL",
+// 			response: SGDStorageCaseResp{
+// 				err: nil,
+// 			},
+// 		},
 
-		//6
-		SGDStorageCase{
-			k:      "key",
-			method: "GET",
-			response: SGDStorageCaseResp{
-				err: errors.New("failed to get value: redigo: nil returned"),
-				v:   nil,
-			},
-		},
+// 		//6
+// 		SGDStorageCase{
+// 			k:      "key",
+// 			method: "GET",
+// 			response: SGDStorageCaseResp{
+// 				err: errors.New("failed to get value: redigo: nil returned"),
+// 				v:   nil,
+// 			},
+// 		},
 
-		//7
-		SGDStorageCase{
-			k:      "another_key",
-			method: "DEL",
-			response: SGDStorageCaseResp{
-				err: nil,
-			},
-		},
-	}
+// 		//7
+// 		SGDStorageCase{
+// 			k:      "another_key",
+// 			method: "DEL",
+// 			response: SGDStorageCaseResp{
+// 				err: nil,
+// 			},
+// 		},
+// 	}
 
-	for i, c := range cases {
-		switch c.method {
-		//StorageSet
-		case "SET":
-			if err := StorageSet(c.k, c.v, c.t); err != c.response.err {
-				t.Errorf("\nSGD test %d failed:\nEXPECTED: %v\nGOT: %v", i+1, c.response.err, err)
-			}
-		//StorageGet
-		case "GET":
-			if v, err := StorageGet(c.k); !errEq(err, c.response.err) || !reflect.DeepEqual(v, c.response.v) {
-				t.Errorf("\nSGD test %d failed:\nEXPECTED: (%s,%v)\nGOT: (%s,%v)", i+1, c.response.v, c.response.err, v, err)
-			}
-		//StorageDel
-		case "DEL":
-			if err := StorageDel(c.k); err != c.response.err {
-				t.Errorf("\nSGD test %d failed:\nEXPECTED: %v\nGOT: %v", i+1, c.response.err, err)
-			}
-		}
-	}
-}
+// 	for i, c := range cases {
+// 		switch c.method {
+// 		//StorageSet
+// 		case "SET":
+// 			if err := StorageSet(c.k, c.v, c.t); err != c.response.err {
+// 				t.Errorf("\nSGD test %d failed:\nEXPECTED: %v\nGOT: %v", i+1, c.response.err, err)
+// 			}
+// 		//StorageGet
+// 		case "GET":
+// 			if v, err := StorageGet(c.k); !errEq(err, c.response.err) || !reflect.DeepEqual(v, c.response.v) {
+// 				t.Errorf("\nSGD test %d failed:\nEXPECTED: (%s,%v)\nGOT: (%s,%v)", i+1, c.response.v, c.response.err, v, err)
+// 			}
+// 		//StorageDel
+// 		case "DEL":
+// 			if err := StorageDel(c.k); err != c.response.err {
+// 				t.Errorf("\nSGD test %d failed:\nEXPECTED: %v\nGOT: %v", i+1, c.response.err, err)
+// 			}
+// 		}
+// 	}
+// }

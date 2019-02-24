@@ -9,9 +9,15 @@ const (
 	NotActive
 )
 
+// BasePack 2**
+const (
+	WrongJSON = 200 + iota
+)
+
 //DB errors pack 5**
 const (
-	LostConnectToDB = 500 + iota
+	InternalDatabase = 500 + iota
+	InternalStorage
 	RowNotFound
 	FailedToValidate
 	AlreadyUsed

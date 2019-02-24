@@ -13,19 +13,15 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	logging "github.com/op/go-logging"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"2019_1_HotCode/apptypes"
 	"2019_1_HotCode/dblib"
 )
 
-const (
-	// docker run -d -p 6379:6379 redis
-	// docker kill $$(docker ps -q)
-	// docker rm $$(docker ps -a -q)
-	redisDSN = "redis://user:@localhost:6379/0"
-)
+// docker run -d -p 6379:6379 redis
+// docker kill $$(docker ps -q)
+// docker rm $$(docker ps -a -q)
 
 var (
 	log = logging.MustGetLogger("auth")
@@ -51,20 +47,13 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 
 // CheckToken метод проверяющий токен, возвращает инфу о юзере(без пароля)
 // позже выделится в отдельный запрос
-func (h *Handler) CheckToken(sessionToken string) (*apptypes.InfoUser, error) {
-	// запросы уедут в либу
-	data, err := redis.Bytes(h.SessionStoreConn.Do("GET", sessionToken))
-	if err != nil {
-		return nil, err
+func (h *Handler) CheckToken(sessionToken string) (*apptypes.InfoUser, *apptypes.Errors) {
+	session, errs := dblib.GetSession(sessionToken)
+	if errs != nil {
+		return nil, errs
 	}
 
-	userInfo := &apptypes.InfoUser{}
-	err = json.Unmarshal(data, userInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	return userInfo, nil
+	return session.Info, nil
 }
 
 // CheckUsername checks if username already used
@@ -238,47 +227,36 @@ func (h *Handler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// записываем токен и инфу
-	sessionToken, err := uuid.NewV4()
-	if err != nil {
-		writeFatalError(w, http.StatusInternalServerError,
-			fmt.Sprintf("session token generate error: %s", err.Error()),
-			"internal server error")
-		return
-	}
-	sessionInfo, err := json.Marshal(&apptypes.InfoUser{
-		ID:     user.ID,
-		Active: user.Active,
-		BasicUser: apptypes.BasicUser{
-			Username: user.Username,
+	session := dblib.Session{
+		Info: &apptypes.InfoUser{
+			ID:     user.ID,
+			Active: user.Active,
+			BasicUser: apptypes.BasicUser{
+				Username: user.Username,
+			},
 		},
-	})
-	if err != nil {
-		writeFatalError(w, http.StatusInternalServerError,
-			fmt.Sprintf("session info marshal error: %s", err.Error()),
-			"internal server error")
+		ExpiresAfter: time.Hour * 24 * 30,
+	}
+	errs = session.Set()
+	if errs != nil {
+		writeApplicationJSON(w, errs)
 		return
 	}
 
-	// на 30 суток(убрать в либу)
-	_, err = h.SessionStoreConn.Do("SETEX", sessionToken.String(), "2628000", sessionInfo)
-	if err != nil {
-		writeFatalError(w, http.StatusInternalServerError,
-			fmt.Sprintf("session store save error: %s", err.Error()),
-			"internal server error")
-		return
-	}
+	// ошибку можем не обрабатывать, так как
+	// это сделал Set() перед нами
+	bInfo, _ := json.Marshal(session.Info)
 
 	// ставим куку
 	http.SetCookie(w, &http.Cookie{
 		Name:    "JSESSIONID",
-		Value:   sessionToken.String(),
+		Value:   session.Token,
 		Expires: time.Now().Add(2628000 * time.Second),
 	})
 
 	//уже есть готовая последовательность байт
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(sessionInfo)
+	w.Write(bInfo)
 
 	log.Noticef("username %s signin ok", user.Username)
 }
@@ -293,12 +271,12 @@ func (h *Handler) SignOutUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//убрать в либу
-	_, err = h.SessionStoreConn.Do("DEL", cookie.Value)
-	if err != nil {
-		writeFatalError(w, http.StatusInternalServerError,
-			fmt.Sprintf("cant delete cookie; err: %s", err.Error()),
-			"internal server error")
+	session := dblib.Session{
+		Token: cookie.Value,
+	}
+	errs := session.Delete()
+	if errs != nil {
+		writeApplicationJSON(w, errs)
 		return
 	}
 
@@ -349,16 +327,13 @@ func main() {
 	logging.SetBackend(logging.NewBackendFormatter(backendLog, logFormat))
 
 	dblib.ConnectDB("warscript_user", "qwerty", "localhost", "warscript_db")
-	sessionsRedisConn, err := redis.DialURL(redisDSN)
-	if err != nil {
-		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
-	}
+	dblib.ConnectStorage("user", "", "localhost", 6379)
 
 	//setting templates
 	h := &Handler{
 		Tmpls:            make(map[string]*template.Template),
 		DBConn:           dblib.GetDB(),
-		SessionStoreConn: sessionsRedisConn,
+		SessionStoreConn: dblib.GetStorage(),
 	}
 	h.Tmpls["index.html"] = template.Must(template.ParseFiles("templates/tmp.html"))
 
@@ -378,7 +353,7 @@ func main() {
 
 	h.Router = AccessLogMiddleware(r)
 	log.Noticef("MainService successfully started at port %d", os.Getenv("MAIN_PORT"))
-	err = http.ListenAndServe(os.Getenv("MAIN_PORT"), h.Router)
+	err := http.ListenAndServe(os.Getenv("MAIN_PORT"), h.Router)
 	if err != nil {
 		log.Criticalf("cant start main server. err: %s", err.Error())
 		return

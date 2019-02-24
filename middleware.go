@@ -31,8 +31,8 @@ func WithAuthentication(next http.HandlerFunc, h *Handler) http.HandlerFunc {
 			http.Error(w, "wrong token", http.StatusUnauthorized)
 			return
 		}
-		info, err := h.CheckToken(cookie.Value)
-		if err != nil {
+		info, errs := h.CheckToken(cookie.Value)
+		if errs != nil {
 			log.Warningf("[%s] %s %s; AUTH FAILED; JSESSIONID: %s",
 				r.Method, r.RemoteAddr, r.URL.Path, cookie.Value)
 			http.Error(w, "wrong token", http.StatusUnauthorized)

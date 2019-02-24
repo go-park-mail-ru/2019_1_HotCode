@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/garyburd/redigo/redis"
 )
 
 const (
@@ -53,12 +51,12 @@ func initHandler() Handler {
 	dblib.ConnectDB("warscript_test_user", "qwerty", "localhost", "warscript_test_db")
 	dblib.GetDB().Exec(reloadTableSQL)
 
-	sessionsRedisConn, _ := redis.DialURL(redisTestStr)
-	sessionsRedisConn.Do("FLUSHDB")
+	dblib.ConnectStorage("user", "", "localhost", 6380)
+	dblib.GetStorage().Do("FLUSHDB")
 
 	return Handler{
 		DBConn:           dblib.GetDB(),
-		SessionStoreConn: sessionsRedisConn,
+		SessionStoreConn: dblib.GetStorage(),
 	}
 }
 
