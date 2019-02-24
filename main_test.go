@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -43,10 +45,9 @@ type Case struct {
 	ExpectedBody string
 	Method       string
 	Endpoint     string
-	Handler      http.HandlerFunc
 }
 
-func initHandler() Handler {
+func initHandler() *Handler {
 	//setting db connection & Drop user table
 	dblib.ConnectDB("warscript_test_user", "qwerty", "localhost", "warscript_test_db")
 	dblib.GetDB().Exec(reloadTableSQL)
@@ -54,28 +55,42 @@ func initHandler() Handler {
 	dblib.ConnectStorage("user", "", "localhost", 6380)
 	dblib.GetStorage().Do("FLUSHDB")
 
-	return Handler{
+	h := &Handler{
 		DBConn:           dblib.GetDB(),
 		SessionStoreConn: dblib.GetStorage(),
 	}
+
+	r := mux.NewRouter()
+	r.HandleFunc("/signup", h.SignUpUser).Methods("POST")
+	r.HandleFunc("/signin", h.SignInUser).Methods("POST")
+	r.HandleFunc("/signout", WithAuthentication(h.SignOutUser, h)).Methods("POST")
+	r.HandleFunc("/users/username_check", h.CheckUsername).Methods("POST")
+	r.HandleFunc("/users/{userID:[0-9]+}", h.GetUser).Methods("GET")
+	r.HandleFunc("/users/{userID:[0-9]+}", WithAuthentication(h.UpdateUser, h)).Methods("POST")
+	//r.HandleFunc("/users/{userID:[0-9]+}/delete", //temproraty deprecated
+	//	WithAuthentication(h.DeleteUser, h)).Methods("POST")
+
+	h.Router = AccessLogMiddleware(r)
+
+	return h
 }
 
-func makeRequest(method, endpoint string, cookies []*http.Cookie,
-	body io.Reader, handle http.HandlerFunc) *httptest.ResponseRecorder {
+func makeRequest(handler http.Handler, method, endpoint string, cookies []*http.Cookie,
+	body io.Reader) *httptest.ResponseRecorder {
 	req, _ := http.NewRequest(method, endpoint, body)
 	for _, cookie := range cookies {
 		req.AddCookie(cookie)
 	}
 
 	resp := httptest.NewRecorder()
-	handle(resp, req)
+	handler.ServeHTTP(resp, req)
 	return resp
 }
 
-func runTableAPITests(t *testing.T, cases []*Case) {
+func runTableAPITests(t *testing.T, h http.Handler, cases []*Case) {
 	for i, c := range cases {
-		resp := makeRequest(c.Method, c.Endpoint,
-			nil, bytes.NewBuffer(c.Payload), c.Handler)
+		resp := makeRequest(h, c.Method, c.Endpoint,
+			nil, bytes.NewBuffer(c.Payload))
 
 		if resp.Code != c.ExpectedCode {
 			t.Fatalf("\n[%d] Expected response code %d Got %d\n", i, c.ExpectedCode, resp.Code)
@@ -97,7 +112,6 @@ func TestSignUpUser(t *testing.T) {
 			ExpectedBody: `{}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
-			Handler:      h.SignUpUser,
 		},
 		{ // На используемый username
 			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
@@ -105,7 +119,6 @@ func TestSignUpUser(t *testing.T) {
 			ExpectedBody: fmt.Sprintf(`{"fields":{"username":{"code":%d,"message":"","description":"pq: duplicate key value violates unique constraint \"uniq_username\""}}}`, apptypes.AlreadyUsed),
 			Method:       "POST",
 			Endpoint:     "/signup",
-			Handler:      h.SignUpUser,
 		},
 		{ // Пустой юзернейм
 			Payload:      []byte(`{"username":"","password":"dsadasd"}`),
@@ -113,7 +126,6 @@ func TestSignUpUser(t *testing.T) {
 			ExpectedBody: fmt.Sprintf(`{"fields":{"username":{"code":%d,"message":"","description":"Username is empty"}}}`, apptypes.FailedToValidate),
 			Method:       "POST",
 			Endpoint:     "/signup",
-			Handler:      h.SignUpUser,
 		},
 		{ // Пустой пароль нас не смущает
 			Payload:      []byte(`{"username":"kek","password":""}`),
@@ -121,7 +133,6 @@ func TestSignUpUser(t *testing.T) {
 			ExpectedBody: `{}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
-			Handler:      h.SignUpUser,
 		},
 		{ // Неправильный формат JSON
 			Payload:      []byte(`{"username":"kek""}`),
@@ -129,60 +140,10 @@ func TestSignUpUser(t *testing.T) {
 			ExpectedBody: "incorrect json\n",
 			Method:       "POST",
 			Endpoint:     "/signup",
-			Handler:      h.SignUpUser,
 		},
 	}
 
-	runTableAPITests(t, cases)
-}
-
-func TestCheckUsername(t *testing.T) {
-	h := initHandler()
-
-	cases := []*Case{
-		{ //Всё ок
-			Payload:      []byte(`{"username":"sdas"}`),
-			ExpectedCode: 200,
-			ExpectedBody: `{"used":false}`,
-			Method:       "POST",
-			Endpoint:     "/users/username_check",
-			Handler:      h.CheckUsername,
-		},
-		{ // Создадим юзера
-			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
-			ExpectedCode: 200,
-			ExpectedBody: `{}`,
-			Method:       "POST",
-			Endpoint:     "/signup",
-			Handler:      h.SignUpUser,
-		},
-		{ // Теперь уже имя занято
-			Payload:      []byte(`{"username":"sdas"}`),
-			ExpectedCode: 200,
-			ExpectedBody: `{"used":true}`,
-			Method:       "POST",
-			Endpoint:     "/users/username_check",
-			Handler:      h.CheckUsername,
-		},
-		{ // Пустой никнейм, очевидно, свободен, но зарегать его всё равно нельзя
-			Payload:      []byte(`{"username":""}`),
-			ExpectedCode: 200,
-			ExpectedBody: `{"used":false}`,
-			Method:       "POST",
-			Endpoint:     "/users/username_check",
-			Handler:      h.CheckUsername,
-		},
-		{ // Неправильный формат JSON
-			Payload:      []byte(`{"username":"kek""}`),
-			ExpectedCode: 400,
-			ExpectedBody: "incorrect json\n",
-			Method:       "POST",
-			Endpoint:     "/users/username_check",
-			Handler:      h.CheckUsername,
-		},
-	}
-
-	runTableAPITests(t, cases)
+	runTableAPITests(t, h.Router, cases)
 }
 
 func TestSignInUser(t *testing.T) {
@@ -195,7 +156,6 @@ func TestSignInUser(t *testing.T) {
 			ExpectedBody: fmt.Sprintf(`{"other":{"code":%d,"message":"","description":"Can't find user with given parameters"}}`, apptypes.RowNotFound),
 			Method:       "POST",
 			Endpoint:     "/signin",
-			Handler:      h.SignInUser,
 		},
 		{ // Создадим юзера
 			Payload:      []byte(`{"username":"kek","password":"lol"}`),
@@ -203,7 +163,6 @@ func TestSignInUser(t *testing.T) {
 			ExpectedBody: `{}`,
 			Method:       "POST",
 			Endpoint:     "/signup",
-			Handler:      h.SignUpUser,
 		},
 		{ // Теперь юзер логинится
 			Payload:      []byte(`{"username":"kek","password":"lol"}`),
@@ -211,7 +170,6 @@ func TestSignInUser(t *testing.T) {
 			ExpectedBody: `{"username":"kek","id":1,"active":true}`,
 			Method:       "POST",
 			Endpoint:     "/signin",
-			Handler:      h.SignInUser,
 		},
 		{ // Пустой никнейм нельзя
 			Payload:      []byte(`{"username":"", "password":"lol"}`),
@@ -219,7 +177,6 @@ func TestSignInUser(t *testing.T) {
 			ExpectedBody: fmt.Sprintf(`{"other":{"code":%d,"message":"","description":"Can't find user with given parameters"}}`, apptypes.RowNotFound),
 			Method:       "POST",
 			Endpoint:     "/signin",
-			Handler:      h.SignInUser,
 		},
 		{ // Неправильный формат JSON
 			Payload:      []byte(`{"username":"kek""}`),
@@ -227,9 +184,220 @@ func TestSignInUser(t *testing.T) {
 			ExpectedBody: "incorrect json\n",
 			Method:       "POST",
 			Endpoint:     "/signin",
-			Handler:      h.SignInUser,
 		},
 	}
 
-	runTableAPITests(t, cases)
+	runTableAPITests(t, h.Router, cases)
+}
+
+func TestSignOutUser(t *testing.T) {
+	h := initHandler()
+	// выходим без токена(ничего не получится)
+	resp := makeRequest(h.Router, "POST", "/signout", nil, nil)
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("\n[0] Expected response code %d Got %d\n",
+			http.StatusUnauthorized, resp.Code)
+	}
+
+	expected0 := "wrong token\n"
+	if resp.Body.String() != expected0 {
+		t.Fatalf("\n[0] Expected response:\n %s\n Got:\n %s\n", expected0, resp.Body.String())
+	}
+
+	// зарегали
+	makeRequest(h.Router, "POST", "/signup",
+		nil, bytes.NewBuffer([]byte(`{"username":"kek","password":"lol"}`)))
+
+	// залогинились
+	resp = makeRequest(h.Router, "POST", "/signin",
+		nil, bytes.NewBuffer([]byte(`{"username":"kek","password":"lol"}`)))
+
+	// разлогинились
+	resp = makeRequest(h.Router, "POST", "/signout",
+		resp.Result().Cookies(), nil)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("\n[1] Expected response code %d Got %d\n",
+			http.StatusOK, resp.Code)
+	}
+
+	expected1 := "{}"
+	if resp.Body.String() != expected1 {
+		t.Fatalf("\n[1] Expected response:\n %s\n Got:\n %s\n", expected1, resp.Body.String())
+	}
+}
+
+func TestCheckUsername(t *testing.T) {
+	h := initHandler()
+
+	cases := []*Case{
+		{ //Всё ок
+			Payload:      []byte(`{"username":"sdas"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"used":false}`,
+			Method:       "POST",
+			Endpoint:     "/users/username_check",
+		},
+		{ // Создадим юзера
+			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+		},
+		{ // Теперь уже имя занято
+			Payload:      []byte(`{"username":"sdas"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"used":true}`,
+			Method:       "POST",
+			Endpoint:     "/users/username_check",
+		},
+		{ // Пустой никнейм, очевидно, свободен, но зарегать его всё равно нельзя
+			Payload:      []byte(`{"username":""}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{"used":false}`,
+			Method:       "POST",
+			Endpoint:     "/users/username_check",
+		},
+		{ // Неправильный формат JSON
+			Payload:      []byte(`{"username":"kek""}`),
+			ExpectedCode: 400,
+			ExpectedBody: "incorrect json\n",
+			Method:       "POST",
+			Endpoint:     "/users/username_check",
+		},
+	}
+
+	runTableAPITests(t, h.Router, cases)
+}
+
+func TestGetUser(t *testing.T) {
+	h := initHandler()
+	cases := []*Case{
+		{ // Такого юзера пока нет
+			ExpectedCode: 200,
+			ExpectedBody: fmt.Sprintf(`{"other":{"code":%d,"message":"","description":"Can't find user with given parameters"}}`,
+				apptypes.RowNotFound),
+			Method:   "GET",
+			Endpoint: "/users/1",
+		},
+		{ // Создадим юзера
+			Payload:      []byte(`{"username":"golang","password":"4ever"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+		},
+		{ //Всё ок
+			ExpectedCode: 200,
+			ExpectedBody: `{"username":"golang","id":1,"active":true}`,
+			Method:       "GET",
+			Endpoint:     "/users/1",
+		},
+	}
+
+	runTableAPITests(t, h.Router, cases)
+}
+
+func TestUpdateUser(t *testing.T) {
+	h := initHandler()
+	cases := []*Case{
+		{ // Нужно залогиниться, чтобы обновлять юзеров
+			ExpectedCode: http.StatusUnauthorized,
+			ExpectedBody: "wrong token\n",
+			Method:       "POST",
+			Endpoint:     "/users/1",
+		},
+		{ // Создадим первого юзера
+			Payload:      []byte(`{"username":"golang","password":"4ever"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+		},
+		{ // Создадим второго юзера
+			Payload:      []byte(`{"username":"scheme","password":"4ever"}`),
+			ExpectedCode: 200,
+			ExpectedBody: `{}`,
+			Method:       "POST",
+			Endpoint:     "/signup",
+		},
+	}
+	runTableAPITests(t, h.Router, cases)
+
+	// логинимся на первом юзере
+	resp := makeRequest(h.Router, "POST", "/signin",
+		nil, bytes.NewBuffer([]byte(`{"username":"golang","password":"4ever"}`)))
+	cookies := resp.Result().Cookies()
+	// обновляем username
+	resp = makeRequest(h.Router, "POST", "/users/1",
+		cookies, bytes.NewBuffer([]byte(`{"username":"Me"}`)))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("\n[3] Expected response code %d Got %d\n",
+			http.StatusOK, resp.Code)
+	}
+	if resp.Body.String() != "{}" {
+		t.Fatalf("\n[3] Expected response:\n %s\n Got:\n %s\n", "{}", resp.Body.String())
+	}
+
+	cases1 := []*Case{
+		{ // имя обновилось
+			ExpectedCode: 200,
+			ExpectedBody: `{"username":"Me","id":1,"active":true}`,
+			Method:       "GET",
+			Endpoint:     "/users/1",
+		},
+	}
+	runTableAPITests(t, h.Router, cases1)
+
+	// пытаемся сменить имя чужому акку
+	resp = makeRequest(h.Router, "POST", "/users/2",
+		cookies, bytes.NewBuffer([]byte(`{"username":"Zatrolen"}`)))
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("\n[4] Expected response code %d Got %d\n",
+			http.StatusOK, resp.Code)
+	}
+	if resp.Body.String() != "you don't have permission to this page\n" {
+		t.Fatalf("\n[4] Expected response:\n %s\n Got:\n %s\n",
+			"you don't have permission to this page\n", resp.Body.String())
+	}
+
+	// пытаемся изменить пароль
+	resp = makeRequest(h.Router, "POST", "/users/1",
+		cookies, bytes.NewBuffer([]byte(`{"newPassword":"4ever and ever"}`)))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("\n[5] Expected response code %d Got %d\n",
+			http.StatusOK, resp.Code)
+	}
+
+	expected0 := fmt.Sprintf(`{"fields":{"oldPassword":{"code":%d,"message":"","description":"Wrong old passwrod"}}}`,
+		apptypes.WrongPassword)
+	if resp.Body.String() != expected0 {
+		t.Fatalf("\n[5] Expected response:\n %s\n Got:\n %s\n", expected0, resp.Body.String())
+	}
+
+	// пытаемся изменить пароль(используем старый)
+	resp = makeRequest(h.Router, "POST", "/users/1",
+		cookies, bytes.NewBuffer([]byte(`{"newPassword":"4ever and ever","oldPassword":"4ever"}`)))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("\n[6] Expected response code %d Got %d\n",
+			http.StatusOK, resp.Code)
+	}
+	if resp.Body.String() != "{}" {
+		t.Fatalf("\n[6] Expected response:\n %s\n Got:\n %s\n", "{}", resp.Body.String())
+	}
+
+	//выходим
+	makeRequest(h.Router, "POST", "/signout",
+		cookies, nil)
+
+	// зашли с новыми данными
+	resp = makeRequest(h.Router, "POST", "/signin",
+		nil, bytes.NewBuffer([]byte(`{"username":"Me","password":"4ever and ever"}`)))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("\n[6] Expected response code %d Got %d\n",
+			http.StatusOK, resp.Code)
+	}
+	if resp.Body.String() != `{"username":"Me","id":1,"active":true}` {
+		t.Fatalf("\n[6] Expected response:\n %s\n Got:\n %s\n", `{"username":"Me","id":1,"active":true}`, resp.Body.String())
+	}
 }

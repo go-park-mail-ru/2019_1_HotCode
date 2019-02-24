@@ -3,13 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	logging "github.com/op/go-logging"
@@ -35,14 +34,8 @@ var (
 // потом можно добавить grpc клиенты
 type Handler struct {
 	Router           http.Handler
-	Tmpls            map[string]*template.Template
 	DBConn           *gorm.DB
 	SessionStoreConn redis.Conn
-}
-
-// Index рисует индекс
-func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
-	h.Tmpls["index.html"].ExecuteTemplate(w, "tmp", struct{}{})
 }
 
 // CheckToken метод проверяющий токен, возвращает инфу о юзере(без пароля)
@@ -155,7 +148,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 				Fields: map[string]*apptypes.Error{
 					"oldPassword": &apptypes.Error{
 						Code:        apptypes.WrongPassword,
-						Description: "Record Not Found",
+						Description: "Wrong old passwrod",
 					},
 				},
 			})
@@ -326,22 +319,22 @@ func main() {
 	backendLog := logging.NewLogBackend(os.Stderr, "", 0)
 	logging.SetBackend(logging.NewBackendFormatter(backendLog, logFormat))
 
-	dblib.ConnectDB("warscript_user", "qwerty", "localhost", "warscript_db")
-	dblib.ConnectStorage("user", "", "localhost", 6379)
+	err := dblib.ConnectDB("warscript_user", "qwerty", "localhost", "warscript_db")
+	if err != nil {
+		log.Fatalf("failed to connect to db; err: %s", err.Error())
+	}
+	err = dblib.ConnectStorage("user", "", "localhost", 6379)
+	if err != nil {
+		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
+	}
 
 	//setting templates
 	h := &Handler{
-		Tmpls:            make(map[string]*template.Template),
 		DBConn:           dblib.GetDB(),
 		SessionStoreConn: dblib.GetStorage(),
 	}
-	h.Tmpls["index.html"] = template.Must(template.ParseFiles("templates/tmp.html"))
 
 	r := mux.NewRouter()
-	r.PathPrefix("/static/").Handler(
-		http.StripPrefix("/static/",
-			http.FileServer(http.Dir("static/"))))
-	r.HandleFunc("/", h.Index).Methods("GET")
 	r.HandleFunc("/signup", h.SignUpUser).Methods("POST")
 	r.HandleFunc("/signin", h.SignInUser).Methods("POST")
 	r.HandleFunc("/signout", WithAuthentication(h.SignOutUser, h)).Methods("POST")
@@ -353,7 +346,7 @@ func main() {
 
 	h.Router = AccessLogMiddleware(r)
 	log.Noticef("MainService successfully started at port %d", os.Getenv("MAIN_PORT"))
-	err := http.ListenAndServe(os.Getenv("MAIN_PORT"), h.Router)
+	err = http.ListenAndServe(os.Getenv("MAIN_PORT"), h.Router)
 	if err != nil {
 		log.Criticalf("cant start main server. err: %s", err.Error())
 		return

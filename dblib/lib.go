@@ -4,7 +4,6 @@ import (
 	"2019_1_HotCode/apptypes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -21,27 +20,28 @@ var db *gorm.DB
 var storage redis.Conn
 
 // ConnectDB открывает соединение с базой
-func ConnectDB(dbUser, dbPass, dbHost, dbName string) {
+func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
 	var err error
 	db, err = gorm.Open("postgres",
 		fmt.Sprintf("postgres://%s:%s@%s/%s", dbUser, dbPass, dbHost, dbName))
 	if err != nil {
-		log.Fatalf("failed to connect to db; err: %s", err.Error())
+		return err
 	}
 	// выключаем, так как у нас есть своё логирование
 	db.LogMode(false)
-
+	return nil
 }
 
 // ConnectStorage открывает соединение с хранилищем для sessions
 func ConnectStorage(storageUser, storagePass, storageHost string,
-	storagePort int) {
+	storagePort int) error {
 	var err error
 	storage, err = redis.DialURL(fmt.Sprintf(
 		"redis://%s:%s@%s:%d/0", storageUser, storagePass, storageHost, storagePort))
 	if err != nil {
-		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
+		return err
 	}
+	return nil
 }
 
 //GetDB returns initiated database
