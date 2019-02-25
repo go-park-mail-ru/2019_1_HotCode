@@ -1,7 +1,7 @@
 package main
 
 import (
-	"2019_1_HotCode/apptypes"
+	"2019_1_HotCode/controllers"
 	"context"
 	"net/http"
 	"os"
@@ -40,7 +40,7 @@ func WithAuthentication(next http.HandlerFunc, h *Handler) http.HandlerFunc {
 		}
 
 		log.Noticef("username %s; session %s; check ok", info.Username, cookie.Value)
-		ctx := context.WithValue(r.Context(), apptypes.UserInfoKey, info)
+		ctx := context.WithValue(r.Context(), controllers.UserInfoKey, info)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

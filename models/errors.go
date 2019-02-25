@@ -1,33 +1,34 @@
-package apptypes
+package models
 
 //OK everything is fine
 const OK = 0
 
-// Auth pack 1**
+//DB errors pack 7**
 const (
-	WrongPassword = 100 + iota
-	NotActive
-)
-
-// BasePack 2**
-const (
-	WrongJSON = 200 + iota
-)
-
-//DB errors pack 5**
-const (
-	InternalDatabase = 500 + iota
+	InternalDatabase = 700 + iota
 	InternalStorage
 	RowNotFound
 	FailedToValidate
 	AlreadyUsed
 	CantCreate
 	CantSave
+	PasswordCrypt
+)
+
+// BasePack 8**
+const (
+	WrongJSON = 800 + iota
+)
+
+// Auth pack 9**
+const (
+	WrongPassword = 900 + iota
+	NotActive
 )
 
 // Error структура ошибки
 type Error struct {
-	Code        int64  `json:"code"`
+	Code        int    `json:"code"`
 	Message     string `json:"message"`
 	Description string `json:"description"`
 }
