@@ -1,28 +1,10 @@
 package models
 
 import (
-	"strings"
-
+	"github.com/lib/pq"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
-
-// BasicUser базовые поля
-type BasicUser struct {
-	Username string `json:"username"`
-}
-
-// InfoUser BasicUser, расширенный служебной инфой
-type InfoUser struct {
-	BasicUser
-	ID     int64 `json:"id"`
-	Active bool  `json:"active"`
-}
-
-// FormUser BasicUser, расширенный паролем, используется для входа и регистрации
-type FormUser struct {
-	BasicUser
-	Password string `json:"password"`
-}
 
 //User model for users table
 type User struct {
@@ -40,155 +22,62 @@ func (u *User) TableName() string {
 	return "user"
 }
 
-//Validate validates user parameters
-func (u *User) Validate() *Errors {
-	errs := Errors{
-		Fields: make(map[string]*Error),
-	}
-
-	if u.Username == "" {
-		errs.Fields["username"] = &Error{
-			Code:        FailedToValidate,
-			Description: "Username is empty",
-		}
-	}
-
-	if len(errs.Fields) != 0 {
-		return &errs
-	}
-
-	return nil
-}
-
-//Create validates and in case of success creates user in database
-func (u *User) Create() *Errors {
-	err := u.Validate()
-	if err != nil {
-		return err
-	}
-	if !db.NewRecord(u) {
-		return &Errors{
-			Fields: map[string]*Error{
-				"id": &Error{
-					Code:        CantCreate,
-					Description: "User cant be formed, maybe try Update?",
-				},
-			},
-		}
-	}
-
+//Create создаёт запись в базе с новыми полями
+func (u *User) Create() error {
 	var cryptErr error
 	u.PasswrodCrypt, cryptErr = bcrypt.GenerateFromPassword([]byte(u.Password),
 		bcrypt.MinCost)
 	if cryptErr != nil {
-		return &Errors{
-			Other: &Error{
-				Code:        PasswordCrypt,
-				Description: "cant generate hash from password",
-			},
-		}
+		return errors.Wrap(cryptErr, "password generate error")
 	}
-	u.Password = ""
 
 	if errDB := db.Create(u).Error; errDB != nil {
-		if strings.Index(errDB.Error(), "uniq_username") != -1 {
-			return &Errors{
-				Fields: map[string]*Error{
-					"username": &Error{
-						Code:        AlreadyUsed,
-						Description: errDB.Error(),
-					},
-				},
-			}
+		if errDB.(*pq.Error).Code == "23505" {
+			return ErrUsernameTaken
 		}
-		return &Errors{
-			Other: &Error{
-				Code:        InternalDatabase,
-				Description: errDB.Error(),
-			},
-		}
+
+		return errors.Wrap(errDB, "user create error")
 	}
+
 	return nil
 }
 
-//Save validates and in case of success saves user to database
-func (u *User) Save() *Errors {
-	err := u.Validate()
-	if err != nil {
-		return err
-	}
-	if db.NewRecord(u) {
-		return &Errors{
-			Fields: map[string]*Error{
-				"id": &Error{
-					Code:        CantSave,
-					Description: "User doesn't exist, maybe try Create?",
-				},
-			},
-		}
-	}
-
+//Save сохраняет юзера в базу
+func (u *User) Save() error {
 	if u.Password != "" {
 		newPass, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.MinCost)
 		if err != nil {
-			return &Errors{
-				Other: &Error{
-					Code:        PasswordCrypt,
-					Description: "cant generate hash from password",
-				},
-			}
+			return errors.Wrap(err, "password generate error")
 		}
 
 		u.PasswrodCrypt = newPass
-		u.Password = ""
 	}
 
 	if errDB := db.Save(u).Error; errDB != nil {
-		if strings.Index(errDB.Error(), "uniq_username") != -1 {
-			return &Errors{
-				Fields: map[string]*Error{
-					"username": &Error{
-						Code:        AlreadyUsed,
-						Description: errDB.Error(),
-					},
-				},
-			}
+		if errDB.(*pq.Error).Code == "23505" {
+			return ErrUsernameTaken
 		}
-		return &Errors{
-			Other: &Error{
-				Code:        InternalDatabase,
-				Description: errDB.Error(),
-			},
-		}
+
+		return errors.Wrap(errDB, "user save error")
 	}
+
 	return nil
 }
 
 // CheckPassword проверяет пароль у юзера и сохранённый в модели
 func (u *User) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword(u.PasswrodCrypt, []byte(password))
-	return err != nil
+	return err == nil
 }
 
-//GetUser gets user by params
-func GetUser(params map[string]interface{}) (*User, *Errors) {
+//GetUser получает юзера по данным параметрам
+func GetUser(params map[string]interface{}) (*User, error) {
 	u := &User{}
-	// если уедет база
 	if dbc := db.Where(params).First(u); dbc.RecordNotFound() ||
 		dbc.NewRecord(u) {
-		return nil, &Errors{
-			Other: &Error{
-				Code:        RowNotFound,
-				Description: "Can't find user with given parameters",
-			},
-		}
+		return nil, ErrNotExists
 	} else if dbc.Error != nil {
-		return nil, &Errors{
-			Other: &Error{
-				Code:        InternalDatabase,
-				Description: dbc.Error.Error(),
-			},
-		}
+		return nil, errors.Wrap(dbc.Error, "get user internal error")
 	}
 
 	return u, nil

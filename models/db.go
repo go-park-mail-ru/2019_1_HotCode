@@ -27,11 +27,10 @@ func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
 }
 
 // ConnectStorage открывает соединение с хранилищем для sessions
-func ConnectStorage(storageUser, storagePass, storageHost string,
-	storagePort int) error {
+func ConnectStorage(storageUser, storagePass, storageHost string) error {
 	var err error
 	storage, err = redis.DialURL(fmt.Sprintf(
-		"redis://%s:%s@%s:%d/", storageUser, storagePass, storageHost, storagePort))
+		"redis://%s:%s@%s", storageUser, storagePass, storageHost))
 	if err != nil {
 		return err
 	}

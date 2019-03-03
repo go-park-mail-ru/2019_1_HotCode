@@ -5,10 +5,10 @@ import (
 	"2019_1_HotCode/utils"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // ContextKey ключ для контекста реквеста
@@ -20,36 +20,32 @@ const (
 	UserInfoKey ContextKey = 1
 )
 
-// UserInfo достаёт инфу о юзере из контекста
-func UserInfo(r *http.Request) *models.InfoUser {
+// UserInfo достаёт инфу о юзере из контекстаs
+func UserInfo(r *http.Request) *InfoUser {
 	if rv := r.Context().Value(UserInfoKey); rv != nil {
-		return rv.(*models.InfoUser)
+		return rv.(*InfoUser)
 	}
 	return nil
 }
 
 // CheckUsername checks if username already used
 func CheckUsername(w http.ResponseWriter, r *http.Request) {
-	bUser := &models.BasicUser{}
+	bUser := &BasicUser{}
 	err := utils.DecodeBodyJSON(r.Body, bUser)
 	if err != nil {
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, &models.Error{
-			Code:        http.StatusBadRequest,
-			Description: "unable to decode request body;",
-		})
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
 		return
 	}
 
-	_, errs := models.GetUser(map[string]interface{}{
+	_, err = models.GetUser(map[string]interface{}{
 		"username": bUser.Username,
 	})
-	used := (errs == nil || errs.Other.Code != models.RowNotFound)
+	used := (err == nil || errors.Cause(err) != models.ErrNotExists)
 	utils.WriteApplicationJSON(w, http.StatusOK, &struct {
 		Used bool `json:"used"`
 	}{
 		Used: used,
 	})
-	// log.Noticef("username %s check ok; USED: %t", bUser.Username, used)
 }
 
 // GetUser get user info by ID
@@ -57,247 +53,228 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	//вот это всё уложить в либу
-	user, errs := models.GetUser(map[string]interface{}{
-		"id": vars["userID"],
+	user, err := models.GetUser(map[string]interface{}{
+		"id": vars["user_id"],
 	})
-	if errs != nil {
-		if errs.Other != nil {
-			if errs.Other.Code == models.RowNotFound {
-				errs.Other.Code = http.StatusNotFound
-			} else if errs.Other.Code == models.InternalDatabase {
-				errs.Other.Code = http.StatusInternalServerError
-			}
-			utils.WriteApplicationJSON(w, errs.Other.Code, errs.Other)
+	if err != nil {
+		if errors.Cause(err) == models.ErrNotExists {
+			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(NotExists))
+		} else {
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
 	}
 
-	utils.WriteApplicationJSON(w, http.StatusOK, &models.InfoUser{
-		ID:     user.ID,
-		Active: user.Active,
-		BasicUser: models.BasicUser{
-			Username: user.Username,
+	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
+		ID:     &user.ID,
+		Active: &user.Active,
+		BasicUser: BasicUser{
+			Username: &user.Username,
 		},
 	})
-
-	// log.Noticef("user %s was found", vars["userID"])
 }
 
-// UpdateUser updates user info by ID
+// UpdateUser обновляет данные пользователя
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
 	info := UserInfo(r)
 
-	//Попытка поменять поля без доступа к этому акку
-	if vars["userID"] != strconv.Itoa(int(info.ID)) {
-		utils.WriteApplicationJSON(w, http.StatusForbidden, &models.Error{
-			Code:        http.StatusForbidden,
-			Description: "you don't have permission to this page",
-		})
-		return
-	}
-
 	updateForm := &struct {
-		models.BasicUser
-		OldPassword string `json:"oldPassword"`
-		NewPassword string `json:"newPassword"`
+		BasicUser
+		OldPassword *string `json:"oldPassword"`
+		NewPassword *string `json:"newPassword"`
 	}{}
 	err := utils.DecodeBodyJSON(r.Body, updateForm)
 	if err != nil {
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, &models.Error{
-			Code:        http.StatusBadRequest,
-			Description: "unable to decode request body;",
-		})
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
 		return
 	}
 
 	// нечего обновлять
-	if updateForm.Username == "" && updateForm.NewPassword == "" {
-		utils.WriteApplicationJSON(w, http.StatusOK, &models.Errors{})
+	if updateForm.Username == nil && updateForm.NewPassword == nil {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	user, errs := models.GetUser(map[string]interface{}{
-		"id": vars["userID"],
+	user, err := models.GetUser(map[string]interface{}{
+		"id": info.ID,
 	})
-	if errs != nil {
-		if errs.Other != nil {
-			if errs.Other.Code == models.RowNotFound {
-				errs.Other.Code = http.StatusNotFound
-			} else if errs.Other.Code == models.InternalDatabase {
-				errs.Other.Code = http.StatusInternalServerError
-			}
-			utils.WriteApplicationJSON(w, errs.Other.Code, errs.Other)
+	if err != nil {
+		if errors.Cause(err) == models.ErrNotExists {
+			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(NotExists))
+		} else {
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
 	}
 
-	if updateForm.Username != "" {
-		user.Username = updateForm.Username
+	if updateForm.Username != nil {
+		user.Username = *updateForm.Username
 	}
 
-	if updateForm.NewPassword != "" {
-		if !user.CheckPassword(updateForm.NewPassword) {
-			// log.Warningf("user: %s wrong password", user.Username)
-			utils.WriteApplicationJSON(w, http.StatusBadRequest, &models.Errors{
-				Fields: map[string]*models.Error{
-					"oldPassword": &models.Error{
-						Code:        models.WrongPassword,
-						Description: "Wrong old passwrod",
-					},
-				},
+	// Если обновляется пароль, нужно проверить,
+	// что пользователь знает старый
+	if updateForm.NewPassword != nil {
+		if updateForm.OldPassword == nil {
+			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+				"oldPassword": Required,
+			})
+			return
+		}
+
+		if !user.CheckPassword(*updateForm.OldPassword) {
+			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+				"oldPassword": Invalid,
 			})
 			return
 		}
 	}
 
-	if errs = user.Save(); errs != nil {
-		var code int
-		if errs.Other != nil && errs.Other.Code == models.InternalDatabase {
-			code = http.StatusInternalServerError
-			errs.Other.Code = http.StatusInternalServerError
+	if err := user.Save(); err != nil {
+		cause := errors.Cause(err)
+		if cause == models.ErrUsernameTaken {
+			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+				"username": Taken,
+			})
 		} else {
-			code = http.StatusBadRequest
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
-
-		utils.WriteApplicationJSON(w, code, errs)
 		return
 	}
 
-	// log.Noticef("user %d updated;", info.ID)
-	utils.WriteApplicationJSON(w, http.StatusOK, &models.Errors{})
+	w.WriteHeader(http.StatusOK)
+}
+
+// CreateUser creates new user
+func CreateUser(w http.ResponseWriter, r *http.Request) {
+	form := &FormUser{}
+	err := utils.DecodeBodyJSON(r.Body, form)
+	if err != nil {
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
+		return
+	}
+
+	if err := form.Validate(); err != nil {
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, err.(*ValidationError))
+		return
+	}
+
+	user := models.User{
+		Username: *form.Username,
+		Password: *form.Password,
+	}
+
+	if err = user.Create(); err != nil {
+		cause := errors.Cause(err)
+		if cause == models.ErrUsernameTaken {
+			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+				"username": Taken,
+			})
+		} else {
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // SignInUser signs in and returns the authentication cookie
 func SignInUser(w http.ResponseWriter, r *http.Request) {
-	form := &models.FormUser{}
+	form := &FormUser{}
 	err := utils.DecodeBodyJSON(r.Body, form)
 	if err != nil {
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, &models.Error{
-			Code:        http.StatusBadRequest,
-			Description: "unable to decode request body;",
-		})
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
 		return
 	}
 
-	user, errs := models.GetUser(map[string]interface{}{
+	if err := form.Validate(); err != nil {
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, err.(*ValidationError))
+		return
+	}
+
+	user, err := models.GetUser(map[string]interface{}{
 		"username": form.Username,
 	})
-	if errs != nil {
-		if errs.Other != nil {
-			if errs.Other.Code == models.RowNotFound {
-				errs.Other.Code = http.StatusNotFound
-			} else if errs.Other.Code == models.InternalDatabase {
-				errs.Other.Code = http.StatusInternalServerError
-			}
-			utils.WriteApplicationJSON(w, errs.Other.Code, errs.Other)
+	if err != nil {
+		cause := errors.Cause(err)
+		if cause == models.ErrNotExists {
+			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+				"username": NotExists,
+			})
+		} else {
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
 	}
 
+	// пользователь удалён
 	if !user.Active {
-		utils.WriteApplicationJSON(w, http.StatusNotFound, &models.Error{
-			Code:        http.StatusNotFound,
-			Description: "User is not active",
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+			"username": NotExists,
 		})
 		return
 	}
 
-	if !user.CheckPassword(form.Password) {
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, &models.Errors{
-			Fields: map[string]*models.Error{
-				"password": &models.Error{
-					Code:        models.WrongPassword,
-					Description: "Wrong old passwrod",
-				},
-			},
+	if !user.CheckPassword(*form.Password) {
+		utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+			"password": Invalid,
 		})
 		return
 	}
 
-	session := models.Session{
-		Info: &models.InfoUser{
-			ID:     user.ID,
-			Active: user.Active,
-			BasicUser: models.BasicUser{
-				Username: user.Username,
-			},
+	data, _ := json.Marshal(&InfoUser{
+		ID:     &user.ID,
+		Active: &user.Active,
+		BasicUser: BasicUser{
+			Username: &user.Username,
 		},
+	})
+	session := models.Session{
+		Payload:      data,
 		ExpiresAfter: time.Hour * 24 * 30,
 	}
-	errs = session.Set()
-	if errs != nil {
-		utils.WriteApplicationJSON(w, http.StatusInternalServerError, errs.Other)
+	err = session.Set()
+	if err != nil {
+		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		return
 	}
-
-	// ошибку можем не обрабатывать, так как
-	// это сделал Set() перед нами
-	bInfo, _ := json.Marshal(session.Info)
 
 	// ставим куку
 	http.SetCookie(w, &http.Cookie{
-		Name:    "JSESSIONID",
-		Value:   session.Token,
-		Expires: time.Now().Add(2628000 * time.Second),
+		Name:     "JSESSIONID",
+		Value:    session.Token,
+		Expires:  time.Now().Add(2628000 * time.Second),
+		HttpOnly: true,
 	})
 
-	//уже есть готовая последовательность байт
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(bInfo)
-	// log.Noticef("username %s signin ok", user.Username)
+	w.WriteHeader(http.StatusOK)
 }
 
 // SignOutUser signs out and deletes the authentication cookie
 func SignOutUser(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("JSESSIONID")
 	if err != nil {
-		utils.WriteApplicationJSON(w, http.StatusInternalServerError, &models.Error{
-			Code:        http.StatusInternalServerError,
-			Description: "cant get cookie;",
-		})
+		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(Invalid))
 		return
 	}
 
 	session := models.Session{
 		Token: cookie.Value,
 	}
-	errs := session.Delete()
-	if errs != nil {
-		utils.WriteApplicationJSON(w, http.StatusInternalServerError, errs.Other)
+	err = session.Delete()
+	if err != nil {
+		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		return
 	}
 
 	cookie.Expires = time.Unix(0, 0)
 	http.SetCookie(w, cookie)
 
-	//log.Noticef("token %s removed", cookie.Value)
-	utils.WriteApplicationJSON(w, http.StatusOK, &models.Errors{})
+	w.WriteHeader(http.StatusOK)
 }
 
-// SignUpUser creates new user
-func SignUpUser(w http.ResponseWriter, r *http.Request) {
-	form := &models.FormUser{}
-	err := utils.DecodeBodyJSON(r.Body, form)
-	if err != nil {
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, &models.Error{
-			Code:        http.StatusBadRequest,
-			Description: "unable to decode request body;",
-		})
-		return
-	}
-
-	user := models.User{
-		Username: form.Username,
-		Password: form.Password,
-	}
-
-	errs := user.Create()
-	if errs != nil {
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, errs)
-		return
-	}
-
-	// log.Noticef("user %s created", user.Username)
-	utils.WriteApplicationJSON(w, http.StatusOK, &models.Errors{})
+// GetSession возвращает сессмю
+func GetSession(w http.ResponseWriter, r *http.Request) {
+	info := UserInfo(r)
+	utils.WriteApplicationJSON(w, http.StatusOK, info)
 }

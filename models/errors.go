@@ -1,42 +1,16 @@
 package models
 
-//OK everything is fine
-const OK = 0
+import "errors"
 
-//DB errors pack 7**
-const (
-	InternalDatabase = 700 + iota
-	InternalStorage
-	RowNotFound
-	FailedToValidate
-	AlreadyUsed
-	CantCreate
-	CantSave
-	PasswordCrypt
+var (
+	// ErrInvalid у поля неправильный формат
+	ErrInvalid = errors.New("invalid")
+	// ErrRequired поле обязательно, но не было передано
+	ErrRequired = errors.New("required")
+	// ErrTaken это поле должно быть уникальным и уже используется
+	ErrTaken = errors.New("taken")
+	// ErrNotExists такой записи нет
+	ErrNotExists = errors.New("not_exists")
+	// ErrUsernameTaken имя пользователя занято
+	ErrUsernameTaken = errors.New("username taken")
 )
-
-// BasePack 8**
-const (
-	WrongJSON = 800 + iota
-)
-
-// Auth pack 9**
-const (
-	WrongPassword = 900 + iota
-	NotActive
-)
-
-// Error структура ошибки
-type Error struct {
-	Code        int    `json:"code"`
-	Message     string `json:"message"`
-	Description string `json:"description"`
-}
-
-// Errors struct for errors:
-// (поле, ошибка)
-// others - ошибки, которые нельзя отнести к полям
-type Errors struct {
-	Other  *Error            `json:"other,omitempty"`
-	Fields map[string]*Error `json:"fields,omitempty"`
-}

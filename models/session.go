@@ -1,77 +1,32 @@
 package models
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 )
 
 // Session модель для работы с сессиями
 type Session struct {
 	Token        string
-	Info         *InfoUser
+	Payload      []byte
 	ExpiresAfter time.Duration
-}
-
-// Validate валидация сессии
-func (s *Session) Validate() *Errors {
-	errs := Errors{
-		Fields: make(map[string]*Error),
-	}
-
-	if s.Info == nil {
-		errs.Fields["info"] = &Error{
-			Code:        FailedToValidate,
-			Description: "Session info is nil",
-		}
-	}
-
-	if len(errs.Fields) == 0 {
-		return nil
-	}
-
-	return &errs
 }
 
 // Set валидирует и сохраняет сессию в хранилище по сгенерированному токену
 // Токен сохраняется в s.Token
-func (s *Session) Set() *Errors {
-	errs := s.Validate()
-	if errs != nil {
-		return errs
-	}
-
+func (s *Session) Set() error {
 	sessionToken, err := uuid.NewV4()
 	if err != nil {
-		return &Errors{
-			Other: &Error{
-				Code:        CantCreate,
-				Description: fmt.Sprintf("unable to generate token: %s", err.Error()),
-			},
-		}
-	}
-	sessionInfo, err := json.Marshal(s.Info)
-	if err != nil {
-		return &Errors{
-			Other: &Error{
-				Code:        WrongJSON,
-				Description: fmt.Sprintf("unable to marshal user info: %s", err.Error()),
-			},
-		}
+		return errors.Wrap(err, "session token generate error")
 	}
 
 	_, err = storage.Do("SETEX", sessionToken.String(),
-		int(s.ExpiresAfter.Seconds()), sessionInfo)
+		int(s.ExpiresAfter.Seconds()), s.Payload)
 	if err != nil {
-		return &Errors{
-			Other: &Error{
-				Code:        InternalStorage,
-				Description: err.Error(),
-			},
-		}
+		return errors.Wrap(err, "redis save error")
 	}
 
 	s.Token = sessionToken.String()
@@ -79,42 +34,24 @@ func (s *Session) Set() *Errors {
 }
 
 // Delete удаляет сессию с токен s.Token из хранилища
-func (s *Session) Delete() *Errors {
+func (s *Session) Delete() error {
 	_, err := storage.Do("DEL", s.Token)
 	if err != nil {
-		return &Errors{
-			Other: &Error{
-				Code:        InternalStorage,
-				Description: err.Error(),
-			},
-		}
+		return errors.Wrap(err, "redis delete error")
 	}
+
 	return nil
 }
 
 // GetSession получает сессию из хранилища по токену
-func GetSession(token string) (*Session, *Errors) {
+func GetSession(token string) (*Session, error) {
 	data, err := redis.Bytes(storage.Do("GET", token))
 	if err != nil {
-		return nil, &Errors{
-			Other: &Error{
-				Code:        InternalStorage,
-				Description: err.Error(),
-			},
-		}
+		return nil, errors.Wrap(err, "redis get error")
 	}
-	userInfo := &InfoUser{}
-	err = json.Unmarshal(data, userInfo)
-	if err != nil {
-		return nil, &Errors{
-			Other: &Error{
-				Code:        WrongJSON,
-				Description: err.Error(),
-			},
-		}
-	}
+
 	return &Session{
-		Token: token,
-		Info:  userInfo,
+		Token:   token,
+		Payload: data,
 	}, nil
 }

@@ -2,45 +2,63 @@ package main
 
 import (
 	"2019_1_HotCode/controllers"
+	"2019_1_HotCode/models"
+	"2019_1_HotCode/utils"
 	"context"
+	"encoding/json"
+	"log"
 	"net/http"
-	"os"
 
-	"github.com/op/go-logging"
+	"golang.org/x/time/rate"
 )
 
 // AccessLogMiddleware логирование всех запросов
 func AccessLogMiddleware(next http.Handler) http.Handler {
-	//setting logs format
-	backendLog := logging.NewLogBackend(os.Stderr, "", 0)
-	logging.SetBackend(logging.NewBackendFormatter(backendLog, logFormat))
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Infof("[%s] %s %s", r.Method, r.RemoteAddr, r.URL.Path)
+		log.Printf("[%s] %s %s", r.Method, r.RemoteAddr, r.URL.Path)
 		next.ServeHTTP(w, r)
 	})
 }
 
 // WithAuthentication проверка токена перед исполнением запроса
-func WithAuthentication(next http.HandlerFunc, h *Handler) http.HandlerFunc {
+func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("JSESSIONID")
-		if err != nil {
-			log.Warningf("[%s] %s %s; AUTH FAILED; No cookie",
-				r.Method, r.RemoteAddr, r.URL.Path)
-			http.Error(w, "wrong token", http.StatusUnauthorized)
-			return
-		}
-		info, errs := h.CheckToken(cookie.Value)
-		if errs != nil {
-			log.Warningf("[%s] %s %s; AUTH FAILED; JSESSIONID: %s",
-				r.Method, r.RemoteAddr, r.URL.Path, cookie.Value)
-			http.Error(w, "wrong token", http.StatusUnauthorized)
+		cookie, _ := r.Cookie("JSESSIONID")
+		if cookie == nil {
+			utils.WriteApplicationJSON(w, http.StatusUnauthorized,
+				controllers.NewAPIError(controllers.Unauthorized))
 			return
 		}
 
-		log.Noticef("username %s; session %s; check ok", info.Username, cookie.Value)
-		ctx := context.WithValue(r.Context(), controllers.UserInfoKey, info)
+		session, err := models.GetSession(cookie.Value)
+		if err != nil {
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError,
+				controllers.NewAPIError(err.Error()))
+			return
+
+		}
+		user := &controllers.InfoUser{}
+		err = json.Unmarshal(session.Payload, user)
+		if err != nil {
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError,
+				controllers.NewAPIError(err.Error()))
+			return
+
+		}
+
+		ctx := context.WithValue(r.Context(), controllers.UserInfoKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// WithLimiter для запросов, у которых есть ограничение в секунду
+func WithLimiter(next http.HandlerFunc, limiter *rate.Limiter) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if limiter.Allow() == false {
+			http.Error(w, "", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }

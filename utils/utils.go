@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"2019_1_HotCode/models"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -21,16 +20,17 @@ func DecodeBodyJSON(body io.Reader, v interface{}) error {
 // WriteApplicationJSON отправить JSON со структурой или 500, если не ок;
 func WriteApplicationJSON(w http.ResponseWriter, code int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
 
 	respJSON, err := json.Marshal(v)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		respJSON, _ = json.Marshal(&models.Error{
-			Code:        http.StatusInternalServerError,
-			Description: "internal server error",
+		code = http.StatusInternalServerError
+		respJSON, _ = json.Marshal(&struct {
+			Message string `json:"message"`
+		}{
+			Message: "internal server error",
 		})
 	}
 
+	w.WriteHeader(code)
 	w.Write(respJSON)
 }
