@@ -6,17 +6,28 @@ import (
 	"2019_1_HotCode/utils"
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
+	"time"
 
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
 
 // AccessLogMiddleware логирование всех запросов
 func AccessLogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[%s] %s %s", r.Method, r.RemoteAddr, r.URL.Path)
-		next.ServeHTTP(w, r)
+		token, _ := uuid.NewV4()
+		ctx := context.WithValue(r.Context(), controllers.RequestUUIDKey, token.String())
+
+		start := time.Now()
+		next.ServeHTTP(w, r.WithContext(ctx))
+		log.WithFields(log.Fields{
+			"token":       token.String(),
+			"method":      r.Method,
+			"remote_addr": r.RemoteAddr,
+			"work_time":   time.Since(start).Seconds(),
+		}).Info(r.URL.Path)
 	})
 }
 

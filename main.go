@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"os"
 
@@ -13,6 +12,8 @@ import (
 
 	"2019_1_HotCode/controllers"
 	"2019_1_HotCode/models"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // docker run -d -p 6379:6379 redis
@@ -25,6 +26,11 @@ type Handler struct {
 	Router           http.Handler
 	DBConn           *gorm.DB
 	SessionStoreConn redis.Conn
+}
+
+func init() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
 }
 
 func main() {

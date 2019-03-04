@@ -5,10 +5,13 @@ import (
 	"2019_1_HotCode/utils"
 	"encoding/json"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // ContextKey ключ для контекста реквеста
@@ -18,7 +21,14 @@ const (
 	// UserInfoKey ключ, по которому в контексте
 	// реквеста хранится структура юзера после валидации
 	UserInfoKey ContextKey = 1
+	// RequestUUIDKey ключ, по которому в контексте храниться его уникальный ID
+	RequestUUIDKey ContextKey = 2
 )
+
+func init() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
+}
 
 // UserInfo достаёт инфу о юзере из контекстаs
 func UserInfo(r *http.Request) *InfoUser {
@@ -28,11 +38,31 @@ func UserInfo(r *http.Request) *InfoUser {
 	return nil
 }
 
+// TokenInfo достаёт UUID запроса
+func TokenInfo(r *http.Request) string {
+	if rv := r.Context().Value(RequestUUIDKey); rv != nil {
+		return rv.(string)
+	}
+
+	return ""
+}
+
+func getLogger(r *http.Request, funcName string) *log.Entry {
+	token := TokenInfo(r)
+	return log.WithFields(log.Fields{
+		"token":  token,
+		"method": funcName,
+	})
+}
+
 // CheckUsername checks if username already used
 func CheckUsername(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "CheckUsername")
+
 	bUser := &BasicUser{}
 	err := utils.DecodeBodyJSON(r.Body, bUser)
 	if err != nil {
+		logger.Warn(errors.Wrap(err, "decode body error"))
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
 		return
 	}
@@ -50,16 +80,18 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 
 // GetUser get user info by ID
 func GetUser(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "GetUser")
 	vars := mux.Vars(r)
 
-	//вот это всё уложить в либу
 	user, err := models.GetUser(map[string]interface{}{
 		"id": vars["user_id"],
 	})
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
+			logger.Warn("user not_exists")
 			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(NotExists))
 		} else {
+			logger.Error(errors.Wrap(err, "get user method error"))
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
@@ -76,6 +108,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 
 // UpdateUser обновляет данные пользователя
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "UpdateUser")
 	info := UserInfo(r)
 
 	updateForm := &struct {
@@ -85,12 +118,14 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}{}
 	err := utils.DecodeBodyJSON(r.Body, updateForm)
 	if err != nil {
+		logger.Warn(errors.Wrap(err, "decode body error"))
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
 		return
 	}
 
 	// нечего обновлять
 	if updateForm.Username == nil && updateForm.NewPassword == nil {
+		logger.Info("nothing to update")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -100,8 +135,10 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
+			logger.Warn("user not_exists")
 			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(NotExists))
 		} else {
+			logger.Error(errors.Wrap(err, "get user method error"))
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
@@ -115,6 +152,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// что пользователь знает старый
 	if updateForm.NewPassword != nil {
 		if updateForm.OldPassword == nil {
+			logger.Warn("old password required")
 			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
 				"oldPassword": Required,
 			})
@@ -122,6 +160,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !user.CheckPassword(*updateForm.OldPassword) {
+			logger.Warn("old password invalid")
 			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
 				"oldPassword": Invalid,
 			})
@@ -132,10 +171,12 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err := user.Save(); err != nil {
 		cause := errors.Cause(err)
 		if cause == models.ErrUsernameTaken {
+			logger.Warn("username taken")
 			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
 				"username": Taken,
 			})
 		} else {
+			logger.Error(errors.Wrap(err, "user save error"))
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
@@ -146,14 +187,18 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 // CreateUser creates new user
 func CreateUser(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "CreateUser")
+
 	form := &FormUser{}
 	err := utils.DecodeBodyJSON(r.Body, form)
 	if err != nil {
+		logger.Warn(errors.Wrap(err, "decode body error"))
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
 		return
 	}
 
 	if err := form.Validate(); err != nil {
+		logger.Warn(errors.Wrap(err, "invalid form"))
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, err.(*ValidationError))
 		return
 	}
@@ -166,10 +211,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err = user.Create(); err != nil {
 		cause := errors.Cause(err)
 		if cause == models.ErrUsernameTaken {
+			logger.Warn("username taken")
 			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
 				"username": Taken,
 			})
 		} else {
+			logger.Error(errors.Wrap(err, "user create error"))
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
@@ -180,14 +227,18 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // SignInUser signs in and returns the authentication cookie
 func SignInUser(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "SignInUser")
+
 	form := &FormUser{}
 	err := utils.DecodeBodyJSON(r.Body, form)
 	if err != nil {
+		logger.Warn(errors.Wrap(err, "decode body error"))
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(BadJSON))
 		return
 	}
 
 	if err := form.Validate(); err != nil {
+		logger.Warn(errors.Wrap(err, "invalid form"))
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, err.(*ValidationError))
 		return
 	}
@@ -198,10 +249,12 @@ func SignInUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		cause := errors.Cause(err)
 		if cause == models.ErrNotExists {
+			logger.Warn("username not_exists")
 			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
 				"username": NotExists,
 			})
 		} else {
+			logger.Error(errors.Wrap(err, "user get error"))
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		}
 		return
@@ -209,6 +262,7 @@ func SignInUser(w http.ResponseWriter, r *http.Request) {
 
 	// пользователь удалён
 	if !user.Active {
+		logger.Warn("user was deleted")
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
 			"username": NotExists,
 		})
@@ -216,6 +270,7 @@ func SignInUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.CheckPassword(*form.Password) {
+		logger.Warn("password invalid")
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
 			"password": Invalid,
 		})
@@ -235,6 +290,7 @@ func SignInUser(w http.ResponseWriter, r *http.Request) {
 	}
 	err = session.Set()
 	if err != nil {
+		logger.Error(errors.Wrap(err, "set session error"))
 		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		return
 	}
@@ -252,8 +308,11 @@ func SignInUser(w http.ResponseWriter, r *http.Request) {
 
 // SignOutUser signs out and deletes the authentication cookie
 func SignOutUser(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "SignOutUser")
+
 	cookie, err := r.Cookie("JSESSIONID")
 	if err != nil {
+		logger.Error(errors.Wrap(err, "get cookie error"))
 		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(Invalid))
 		return
 	}
@@ -263,6 +322,7 @@ func SignOutUser(w http.ResponseWriter, r *http.Request) {
 	}
 	err = session.Delete()
 	if err != nil {
+		logger.Error(errors.Wrap(err, "session delete error"))
 		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err.Error()))
 		return
 	}
