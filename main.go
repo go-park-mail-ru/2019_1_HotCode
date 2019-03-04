@@ -34,11 +34,13 @@ func init() {
 }
 
 func main() {
-	err := models.ConnectDB("warscript_user", "qwerty", "localhost", "warscript_db")
+	err := models.ConnectDB(os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
+		os.Getenv("DB_HOST"), os.Getenv("DB_NAME"))
 	if err != nil {
 		log.Fatalf("failed to connect to db; err: %s", err.Error())
 	}
-	err = models.ConnectStorage("user", "", "localhost:6379")
+	err = models.ConnectStorage(os.Getenv("STORAGE_USER"), os.Getenv("STORAGE_PASS"),
+		os.Getenv("STORAGE_HOST"))
 	if err != nil {
 		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
 	}
