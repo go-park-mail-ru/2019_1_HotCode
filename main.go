@@ -49,7 +49,8 @@ func main() {
 		SessionStoreConn: models.GetStorage(),
 	}
 
-	r := mux.NewRouter()
+	// этот роутер будет отвечать за первую(и пока единственную) версию апишки
+	r := mux.NewRouter().PathPrefix("/v1").Subrouter()
 
 	r.HandleFunc("/sessions", WithAuthentication(controllers.GetSession)).Methods("GET")
 	r.HandleFunc("/sessions", controllers.SignInUser).Methods("POST")
