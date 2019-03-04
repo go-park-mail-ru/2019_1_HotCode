@@ -19,7 +19,7 @@ type User struct {
 
 //TableName имя таблицы
 func (u *User) TableName() string {
-	return "user"
+	return "users"
 }
 
 //Create создаёт запись в базе с новыми полями
@@ -32,7 +32,9 @@ func (u *User) Create() error {
 	}
 
 	if errDB := db.Create(u).Error; errDB != nil {
-		if errDB.(*pq.Error).Code == "23505" {
+		if pqErr, ok := errDB.(*pq.Error); !ok {
+			return errors.Wrap(errDB, "user create error")
+		} else if pqErr.Code == "23505" {
 			return ErrUsernameTaken
 		}
 
@@ -54,7 +56,7 @@ func (u *User) Save() error {
 	}
 
 	if errDB := db.Save(u).Error; errDB != nil {
-		if errDB.(*pq.Error).Code == "23505" {
+		if pqErr, ok := errDB.(*pq.Error); ok && pqErr.Code == "23505" {
 			return ErrUsernameTaken
 		}
 
@@ -73,11 +75,13 @@ func (u *User) CheckPassword(password string) bool {
 //GetUser получает юзера по данным параметрам
 func GetUser(params map[string]interface{}) (*User, error) {
 	u := &User{}
-	if dbc := db.Where(params).First(u); dbc.RecordNotFound() ||
-		dbc.NewRecord(u) {
-		return nil, ErrNotExists
-	} else if dbc.Error != nil {
-		return nil, errors.Wrap(dbc.Error, "get user internal error")
+	if dbc := db.Where(params).First(u); dbc.Error != nil {
+		if _, ok := dbc.Error.(*pq.Error); !ok &&
+			(dbc.RecordNotFound() || dbc.NewRecord(u)) {
+			return nil, ErrNotExists
+		}
+
+		return nil, errors.Wrap(dbc.Error, "get user error")
 	}
 
 	return u, nil
