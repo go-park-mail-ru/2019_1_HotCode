@@ -12,7 +12,7 @@
 
 ## Описание
 
-[Документация API](https://github.com/HotCodeGroup/warscript-apidoc/tree/master)
+[Документация API](http://apidoc.warscript.tech/)
 
 ## Ссылка на игру
 
