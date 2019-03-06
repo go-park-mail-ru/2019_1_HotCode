@@ -12,6 +12,8 @@
 
 ## Описание
 
+[Документация API](https://github.com/HotCodeGroup/warscript-apidoc/tree/master)
+
 ## Ссылка на игру
 
 ## Репозиторий фронтенда

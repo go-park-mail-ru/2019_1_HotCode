@@ -14,6 +14,30 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// RecoverMiddleware ловит паники и кидает 500ки
+func RecoverMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				utils.WriteApplicationJSON(w, http.StatusInternalServerError,
+					controllers.NewAPIError(models.ErrInternal))
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// CORSMiddleware добавляет настройки CORS в хедер
+func CORSMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "https://20191hotcode-6t88u924a.now.sh")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		next.ServeHTTP(w, r)
+	})
+}
+
 // AccessLogMiddleware логирование всех запросов
 func AccessLogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,14 +61,14 @@ func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 		cookie, _ := r.Cookie("JSESSIONID")
 		if cookie == nil {
 			utils.WriteApplicationJSON(w, http.StatusUnauthorized,
-				controllers.NewAPIError(controllers.Unauthorized))
+				controllers.NewAPIError(controllers.ErrUnauthorized))
 			return
 		}
 
 		session, err := models.GetSession(cookie.Value)
 		if err != nil {
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError,
-				controllers.NewAPIError(err.Error()))
+				controllers.NewAPIError(err))
 			return
 
 		}
@@ -52,7 +76,7 @@ func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 		err = json.Unmarshal(session.Payload, user)
 		if err != nil {
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError,
-				controllers.NewAPIError(err.Error()))
+				controllers.NewAPIError(err))
 			return
 
 		}

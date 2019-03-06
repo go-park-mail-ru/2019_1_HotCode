@@ -1,18 +1,12 @@
 package controllers
 
-const (
-	// BadJSON некорректный JSON
-	BadJSON = "bad_json"
-	// NotExists запись не существует
-	NotExists = "not_exists"
-	// Required поля обязательно для заполнения
-	Required = "required"
-	// Invalid значение поля неверно
-	Invalid = "invalid"
-	// Taken уже занято
-	Taken = "taken"
-	// Unauthorized не авторизован
-	Unauthorized = "unauthorized"
+import "errors"
+
+var (
+	// ErrBadJSON некорректный JSON
+	ErrBadJSON = errors.New("bad_json")
+	// ErrUnauthorized не авторизован
+	ErrUnauthorized = errors.New("unauthorized")
 )
 
 // APIError структура ошибки
@@ -21,8 +15,8 @@ type APIError struct {
 }
 
 // NewAPIError создаёт новый объект ошибки для создания JSON
-func NewAPIError(msg string) *APIError {
+func NewAPIError(err error) *APIError {
 	return &APIError{
-		Message: msg,
+		Message: err.Error(),
 	}
 }

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"2019_1_HotCode/models"
 	"fmt"
 )
 
@@ -30,19 +31,19 @@ type FormUser struct {
 	Password *string `json:"password"`
 }
 
-// Validate валидация полей(проверка на пустсоту)
+// Validate валидация полей
 func (fu *FormUser) Validate() error {
-	errs := ValidationError{}
+	err := ValidationError{}
 	if fu.Username == nil {
-		errs["username"] = Required
+		err["username"] = models.ErrRequired.Error()
 	}
 	if fu.Password == nil {
-		errs["password"] = Required
+		err["password"] = models.ErrRequired.Error()
 	}
 
-	if len(errs) == 0 {
+	if len(err) == 0 {
 		return nil
 	}
 
-	return &errs
+	return &err
 }

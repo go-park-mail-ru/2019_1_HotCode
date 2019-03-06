@@ -13,4 +13,6 @@ var (
 	ErrNotExists = errors.New("not_exists")
 	// ErrUsernameTaken имя пользователя занято
 	ErrUsernameTaken = errors.New("username taken")
+	// ErrInternal всё очень плохо
+	ErrInternal = errors.New("internal server error")
 )

@@ -24,21 +24,21 @@ func (u *User) TableName() string {
 
 //Create создаёт запись в базе с новыми полями
 func (u *User) Create() error {
-	var cryptErr error
-	u.PasswrodCrypt, cryptErr = bcrypt.GenerateFromPassword([]byte(u.Password),
+	var err error
+	u.PasswrodCrypt, err = bcrypt.GenerateFromPassword([]byte(u.Password),
 		bcrypt.MinCost)
-	if cryptErr != nil {
-		return errors.Wrap(cryptErr, "password generate error")
+	if err != nil {
+		return errors.Wrap(err, "password generate error")
 	}
 
-	if errDB := db.Create(u).Error; errDB != nil {
-		if pqErr, ok := errDB.(*pq.Error); !ok {
-			return errors.Wrap(errDB, "user create error")
-		} else if pqErr.Code == "23505" {
+	if err := db.Create(u).Error; err != nil {
+		if pqErr, ok := err.(*pq.Error); !ok {
+			return errors.Wrap(err, "user create error")
+		} else if pqErr.Code == psqlUniqueViolation {
 			return ErrUsernameTaken
 		}
 
-		return errors.Wrap(errDB, "user create error")
+		return errors.Wrap(err, "user create error")
 	}
 
 	return nil
@@ -55,12 +55,12 @@ func (u *User) Save() error {
 		u.PasswrodCrypt = newPass
 	}
 
-	if errDB := db.Save(u).Error; errDB != nil {
-		if pqErr, ok := errDB.(*pq.Error); ok && pqErr.Code == "23505" {
+	if err := db.Save(u).Error; err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == psqlUniqueViolation {
 			return ErrUsernameTaken
 		}
 
-		return errors.Wrap(errDB, "user save error")
+		return errors.Wrap(err, "user save error")
 	}
 
 	return nil

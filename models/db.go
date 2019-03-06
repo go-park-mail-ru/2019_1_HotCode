@@ -13,6 +13,10 @@ import (
 var db *gorm.DB
 var storage redis.Conn
 
+const (
+	psqlUniqueViolation = "23505"
+)
+
 // ConnectDB открывает соединение с базой
 func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
 	var err error

@@ -27,7 +27,7 @@ func WriteApplicationJSON(w http.ResponseWriter, code int, v interface{}) {
 		respJSON, _ = json.Marshal(&struct {
 			Message string `json:"message"`
 		}{
-			Message: "internal server error",
+			Message: err.Error(),
 		})
 	}
 

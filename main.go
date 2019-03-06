@@ -55,14 +55,14 @@ func main() {
 	r := mux.NewRouter().PathPrefix("/v1").Subrouter()
 
 	r.HandleFunc("/sessions", WithAuthentication(controllers.GetSession)).Methods("GET")
-	r.HandleFunc("/sessions", controllers.SignInUser).Methods("POST")
-	r.HandleFunc("/sessions", WithAuthentication(controllers.SignOutUser)).Methods("DELETE")
+	r.HandleFunc("/sessions", controllers.CreateSession).Methods("POST")
+	r.HandleFunc("/sessions", WithAuthentication(controllers.DeleteSession)).Methods("DELETE")
 
 	r.HandleFunc("/users", controllers.CreateUser).Methods("POST")
 	r.HandleFunc("/users", WithAuthentication(controllers.UpdateUser)).Methods("PUT")
 	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
 	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(1, 1))).Methods("POST")
-	h.Router = AccessLogMiddleware(r)
+	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 
 	port := os.Getenv("PORT")
 	log.Printf("MainService successfully started at port %s", port)
