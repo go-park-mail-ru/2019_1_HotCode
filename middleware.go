@@ -1,13 +1,14 @@
 package main
 
 import (
-	"2019_1_HotCode/controllers"
-	"2019_1_HotCode/models"
-	"2019_1_HotCode/utils"
 	"context"
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/go-park-mail-ru/2019_1_HotCode/controllers"
+	"github.com/go-park-mail-ru/2019_1_HotCode/models"
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"

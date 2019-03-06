@@ -1,10 +1,11 @@
 package controllers
 
 import (
-	"2019_1_HotCode/models"
-	"2019_1_HotCode/utils"
 	"net/http"
 	"os"
+
+	"github.com/go-park-mail-ru/2019_1_HotCode/models"
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"

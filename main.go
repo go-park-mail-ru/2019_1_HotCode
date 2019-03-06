@@ -8,10 +8,11 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/gorilla/mux"
+	"github.com/jcftang/logentriesrus"
 	"github.com/jinzhu/gorm"
 
-	"2019_1_HotCode/controllers"
-	"2019_1_HotCode/models"
+	"github.com/go-park-mail-ru/2019_1_HotCode/controllers"
+	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -31,6 +32,13 @@ type Handler struct {
 func init() {
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(os.Stdout)
+
+	// собираем логи в хранилище
+	le, err := logentriesrus.NewLogentriesrusHook("e5a7a062-3136-447a-881c-62d3c9aeb351")
+	if err != nil {
+		os.Exit(-1)
+	}
+	log.AddHook(le)
 }
 
 func main() {

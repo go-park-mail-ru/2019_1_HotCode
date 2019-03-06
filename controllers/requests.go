@@ -1,8 +1,9 @@
 package controllers
 
 import (
-	"2019_1_HotCode/models"
 	"fmt"
+
+	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 )
 
 // ValidationError описывает ошибки валидцации
