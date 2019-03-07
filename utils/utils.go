@@ -32,5 +32,7 @@ func WriteApplicationJSON(w http.ResponseWriter, code int, v interface{}) {
 
 	w.WriteHeader(code)
 	_, err = w.Write(respJSON)
-	log.Error(err)
+	if err != nil {
+		log.WithField("method", "WriteApplicationJSON").Error(err)
+	}
 }
