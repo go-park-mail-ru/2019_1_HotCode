@@ -2,8 +2,11 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // DecodeBodyJSON парсит body в переданную структуру
@@ -24,13 +27,10 @@ func WriteApplicationJSON(w http.ResponseWriter, code int, v interface{}) {
 	respJSON, err := json.Marshal(v)
 	if err != nil {
 		code = http.StatusInternalServerError
-		respJSON, _ = json.Marshal(&struct {
-			Message string `json:"message"`
-		}{
-			Message: err.Error(),
-		})
+		respJSON = []byte(fmt.Sprintf(`"message":"%s"`, err.Error()))
 	}
 
 	w.WriteHeader(code)
-	w.Write(respJSON)
+	_, err = w.Write(respJSON)
+	log.Error(err)
 }

@@ -6,7 +6,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-//User model for users table
+// User model for users table
 type User struct {
 	ID       int64  `gorm:"primary_key"`
 	Username string `gorm:"size:32"`
@@ -17,12 +17,12 @@ type User struct {
 	PasswrodCrypt []byte `gorm:"column:password"`
 }
 
-//TableName имя таблицы
+// TableName имя таблицы
 func (u *User) TableName() string {
 	return "users"
 }
 
-//Create создаёт запись в базе с новыми полями
+// Create создаёт запись в базе с новыми полями
 func (u *User) Create() error {
 	var err error
 	u.PasswrodCrypt, err = bcrypt.GenerateFromPassword([]byte(u.Password),
@@ -44,7 +44,7 @@ func (u *User) Create() error {
 	return nil
 }
 
-//Save сохраняет юзера в базу
+// Save сохраняет юзера в базу
 func (u *User) Save() error {
 	if u.Password != "" {
 		newPass, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.MinCost)
@@ -72,7 +72,7 @@ func (u *User) CheckPassword(password string) bool {
 	return err == nil
 }
 
-//GetUser получает юзера по данным параметрам
+// GetUser получает юзера по данным параметрам
 func GetUser(params map[string]interface{}) (*User, error) {
 	u := &User{}
 	if dbc := db.Where(params).First(u); dbc.Error != nil {

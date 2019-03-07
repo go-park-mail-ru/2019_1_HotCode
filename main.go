@@ -53,7 +53,7 @@ func main() {
 		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
 	}
 
-	//setting templates
+	// setting templates
 	h := &Handler{
 		DBConn:           models.GetDB(),
 		SessionStoreConn: models.GetStorage(),
@@ -70,7 +70,7 @@ func main() {
 	r.HandleFunc("/users", WithAuthentication(controllers.UpdateUser)).Methods("PUT")
 	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
 	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(1, 1))).Methods("POST")
-	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
+	h.Router = CORSMiddleware(RecoverMiddleware(AccessLogMiddleware(r)))
 
 	port := os.Getenv("PORT")
 	log.Printf("MainService successfully started at port %s", port)

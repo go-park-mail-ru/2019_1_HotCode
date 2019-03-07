@@ -41,12 +41,12 @@ func ConnectStorage(storageUser, storagePass, storageHost string) error {
 	return nil
 }
 
-//GetDB returns initiated database
+// GetDB returns initiated database
 func GetDB() *gorm.DB {
 	return db
 }
 
-//GetStorage returns initiated storage
+// GetStorage returns initiated storage
 func GetStorage() redis.Conn {
 	return storage
 }

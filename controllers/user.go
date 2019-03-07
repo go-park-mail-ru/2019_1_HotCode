@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
@@ -23,11 +22,6 @@ const (
 	// RequestUUIDKey ключ, по которому в контексте храниться его уникальный ID
 	RequestUUIDKey ContextKey = 2
 )
-
-func init() {
-	log.SetFormatter(&log.JSONFormatter{})
-	log.SetOutput(os.Stdout)
-}
 
 // UserInfo достаёт инфу о юзере из контекстаs
 func UserInfo(r *http.Request) *InfoUser {
@@ -214,7 +208,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := form.Validate(); err != nil {
+	if err = form.Validate(); err != nil {
 		logger.Warn(errors.Wrap(err, "invalid form"))
 		utils.WriteApplicationJSON(w, http.StatusBadRequest, err.(*ValidationError))
 		return

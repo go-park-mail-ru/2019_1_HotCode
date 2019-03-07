@@ -57,6 +57,7 @@ func AccessLogMiddleware(next http.Handler) http.Handler {
 }
 
 // WithAuthentication проверка токена перед исполнением запроса
+//nolint: interfacer
 func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, _ := r.Cookie("JSESSIONID")
@@ -88,9 +89,10 @@ func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // WithLimiter для запросов, у которых есть ограничение в секунду
+//nolint: interfacer
 func WithLimiter(next http.HandlerFunc, limiter *rate.Limiter) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if limiter.Allow() == false {
+		if !limiter.Allow() {
 			http.Error(w, "", http.StatusTooManyRequests)
 			return
 		}
