@@ -69,16 +69,14 @@ func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 
 		session, err := models.GetSession(cookie.Value)
 		if err != nil {
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError,
-				controllers.NewAPIError(err))
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, controllers.NewAPIError(err))
 			return
 
 		}
 		user := &controllers.InfoUser{}
 		err = json.Unmarshal(session.Payload, user)
 		if err != nil {
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError,
-				controllers.NewAPIError(err))
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, controllers.NewAPIError(err))
 			return
 
 		}

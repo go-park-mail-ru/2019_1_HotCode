@@ -70,8 +70,7 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 	}) // если база лежит
 	if err != nil && errors.Cause(err) != models.ErrNotExists {
 		logger.Error(errors.Wrap(err, "get user method error"))
-		utils.WriteApplicationJSON(w, http.StatusInternalServerError,
-			NewAPIError(err))
+		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
 		return
 	}
 
@@ -95,15 +94,13 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		"id": vars["user_id"],
 	})
 	if err != nil {
-		var code int
 		if errors.Cause(err) == models.ErrNotExists {
 			logger.Warn("user not_exists")
-			code = http.StatusNotFound
+			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(err))
 		} else {
 			logger.Error(errors.Wrap(err, "get user method error"))
-			code = http.StatusInternalServerError
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
 		}
-		utils.WriteApplicationJSON(w, code, NewAPIError(err))
 		return
 	}
 
@@ -144,15 +141,13 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		"id": info.ID,
 	})
 	if err != nil {
-		var code int
 		if errors.Cause(err) == models.ErrNotExists {
 			logger.Warn("user not_exists")
-			code = http.StatusNotFound
+			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(err))
 		} else {
 			logger.Error(errors.Wrap(err, "get user method error"))
-			code = http.StatusInternalServerError
+			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
 		}
-		utils.WriteApplicationJSON(w, code, NewAPIError(err))
 		return
 	}
 

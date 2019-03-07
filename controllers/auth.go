@@ -98,8 +98,7 @@ func DeleteSession(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("JSESSIONID")
 	if err != nil {
 		logger.Error(errors.Wrap(err, "get cookie error"))
-		utils.WriteApplicationJSON(w, http.StatusInternalServerError,
-			NewAPIError(models.ErrInvalid))
+		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(models.ErrInvalid))
 		return
 	}
 
