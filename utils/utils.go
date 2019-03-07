@@ -22,10 +22,12 @@ func DecodeBodyJSON(body io.Reader, v interface{}) error {
 
 // WriteApplicationJSON отправить JSON со структурой или 500, если не ок;
 func WriteApplicationJSON(w http.ResponseWriter, code int, v interface{}) {
+	logger := log.WithField("method", "WriteApplicationJSON")
 	w.Header().Set("Content-Type", "application/json")
 
 	respJSON, err := json.Marshal(v)
 	if err != nil {
+		logger.Error(err)
 		code = http.StatusInternalServerError
 		respJSON = []byte(fmt.Sprintf(`"message":"%s"`, err.Error()))
 	}
@@ -33,6 +35,6 @@ func WriteApplicationJSON(w http.ResponseWriter, code int, v interface{}) {
 	w.WriteHeader(code)
 	_, err = w.Write(respJSON)
 	if err != nil {
-		log.WithField("method", "WriteApplicationJSON").Error(err)
+		logger.Error(err)
 	}
 }
