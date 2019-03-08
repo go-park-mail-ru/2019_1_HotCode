@@ -32,7 +32,7 @@ func RecoverMiddleware(next http.Handler) http.Handler {
 func AccessLogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, _ := uuid.NewV4()
-		ctx := context.WithValue(r.Context(), controllers.RequestUUIDKey, token.String())
+		ctx := context.WithValue(r.Context(), controllers.RequestUUIDKey, token.String()[:8])
 
 		start := time.Now()
 		next.ServeHTTP(w, r.WithContext(ctx))
