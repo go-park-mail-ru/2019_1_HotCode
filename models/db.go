@@ -31,7 +31,6 @@ func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
 
 // ConnectStorage открывает соединение с хранилищем для sessions
 func ConnectStorage(storageUser, storagePass, storageHost string) error {
-	// storage, err = redis.DialURL(fmt.Sprintf("redis://%s:%s@%s", storageUser, storagePass, storageHost))
 	var err error
 	storage = redis.NewClient(&redis.Options{
 		Addr:     storageHost,

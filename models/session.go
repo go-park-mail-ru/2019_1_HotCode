@@ -23,7 +23,6 @@ func (s *Session) Set() error {
 	}
 
 	err = storage.Set(sessionToken.String(), s.Payload, s.ExpiresAfter).Err()
-	// _, err = storage.Do("SETEX", sessionToken.String(), int(s.ExpiresAfter.Seconds()), s.Payload)
 	if err != nil {
 		return errors.Wrap(err, "redis save error")
 	}
@@ -35,7 +34,6 @@ func (s *Session) Set() error {
 // Delete удаляет сессию с токен s.Token из хранилища
 func (s *Session) Delete() error {
 	err := storage.Del(s.Token).Err()
-	// _, err := storage.Do("DEL", s.Token)
 	if err != nil {
 		return errors.Wrap(err, "redis delete error")
 	}
@@ -46,7 +44,6 @@ func (s *Session) Delete() error {
 // GetSession получает сессию из хранилища по токену
 func GetSession(token string) (*Session, error) {
 	data, err := storage.Get(token).Bytes()
-	// data, err := redis.Bytes(storage.Do("GET", token))
 	if err != nil {
 		return nil, errors.Wrap(err, "redis get error")
 	}
