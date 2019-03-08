@@ -49,7 +49,7 @@ func AccessLogMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		next.ServeHTTP(w, r.WithContext(ctx))
 		log.WithFields(log.Fields{
-			"token":       token.String(),
+			"token":       token.String()[:8],
 			"method":      r.Method,
 			"remote_addr": r.RemoteAddr,
 			"work_time":   time.Since(start).Seconds(),
