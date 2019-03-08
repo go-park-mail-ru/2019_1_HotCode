@@ -23,57 +23,14 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if valError := form.Validate(); valError != nil {
-		errWriter.WriteValidationError(valError)
-		return
-	}
-
-	user, err := models.GetUserByUsername(*form.Username)
+	session, err := createSessionImpl(form)
 	if err != nil {
-		if errors.Cause(err) == models.ErrNotExists {
-			errWriter.WriteValidationError(&ValidationError{
-				"username": models.ErrNotExists.Error(),
-			})
-		} else {
-			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "user get error"))
+		if validErr, ok := err.(*ValidationError); ok {
+			errWriter.WriteValidationError(validErr)
+			return
 		}
-		return
-	}
 
-	// пользователь удалён
-	if !user.Active {
-		errWriter.WriteValidationError(&ValidationError{
-			"username": models.ErrNotExists.Error(),
-		})
-		return
-	}
-
-	if !user.CheckPassword(*form.Password) {
-		errWriter.WriteValidationError(&ValidationError{
-			"password": models.ErrInvalid.Error(),
-		})
-		return
-	}
-
-	data, err := json.Marshal(&InfoUser{
-		ID:     &user.ID,
-		Active: &user.Active,
-		BasicUser: BasicUser{
-			Username: &user.Username,
-		},
-	})
-	if err != nil {
-		errWriter.WriteWarn(http.StatusInternalServerError, errors.Wrap(err, "info marshal error"))
-		return
-	}
-
-	session := models.Session{
-		Payload:      data,
-		ExpiresAfter: time.Hour * 24 * 30,
-	}
-	err = session.Set()
-	if err != nil {
-		errWriter.WriteWarn(http.StatusInternalServerError, errors.Wrap(err, "set session error"))
+		errWriter.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 
@@ -86,6 +43,52 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func createSessionImpl(form *FormUser) (*models.Session, error) {
+	if err := form.Validate(); err != nil {
+		return nil, err
+	}
+
+	user, err := models.GetUserByUsername(*form.Username)
+	if err != nil {
+		return nil, errors.Wrap(err, "get user error")
+	}
+
+	// пользователь удалён
+	if !user.Active {
+		return nil, &ValidationError{
+			"username": models.ErrNotExists.Error(),
+		}
+	}
+
+	if !user.CheckPassword(*form.Password) {
+		return nil, &ValidationError{
+			"password": models.ErrInvalid.Error(),
+		}
+	}
+
+	data, err := json.Marshal(&InfoUser{
+		ID:     &user.ID,
+		Active: &user.Active,
+		BasicUser: BasicUser{
+			Username: &user.Username,
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "info marshal error")
+	}
+
+	session := &models.Session{
+		Payload:      data,
+		ExpiresAfter: time.Hour * 24 * 30,
+	}
+	err = session.Set()
+	if err != nil {
+		return nil, errors.Wrap(err, "set session error")
+	}
+
+	return session, nil
 }
 
 // DeleteSession выход + удаление куки

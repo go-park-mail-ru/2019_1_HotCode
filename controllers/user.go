@@ -120,34 +120,45 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	errWriter := NewErrorResponseWriter(w, logger)
 	info := UserInfo(r)
 
-	updateForm := &struct {
-		BasicUser
-		OldPassword *string `json:"oldPassword"`
-		NewPassword *string `json:"newPassword"`
-	}{}
+	updateForm := &FormUserUpdate{}
 	err := utils.DecodeBodyJSON(r.Body, updateForm)
 	if err != nil {
 		errWriter.WriteWarn(http.StatusBadRequest, errors.Wrap(err, "decode body error"))
 		return
 	}
 
+	err = updateUserImpl(info, updateForm)
+	if err != nil {
+		if validErr, ok := err.(*ValidationError); ok {
+			errWriter.WriteValidationError(validErr)
+			return
+		}
+
+		if errors.Cause(err) == models.ErrNotExists {
+			errWriter.WriteWarn(http.StatusUnauthorized, errors.Wrap(err, "user not exists"))
+		} else {
+			errWriter.WriteError(http.StatusInternalServerError, err)
+		}
+
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func updateUserImpl(info *InfoUser, updateForm *FormUserUpdate) error {
 	// нечего обновлять
 	if updateForm.Username == nil && updateForm.NewPassword == nil {
-		logger.Info("nothing to update")
-		w.WriteHeader(http.StatusOK)
-		return
+		return nil
 	}
 
+	// взяли юзера
 	user, err := models.GetUserByID(*info.ID)
 	if err != nil {
-		if errors.Cause(err) == models.ErrNotExists {
-			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "user not exists"))
-		} else {
-			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
-		}
-		return
+		return errors.Wrap(err, "get user error")
 	}
 
+	// хотим обновить username
 	if updateForm.Username != nil {
 		user.Username = *updateForm.Username
 	}
@@ -156,34 +167,32 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// что пользователь знает старый
 	if updateForm.NewPassword != nil {
 		if updateForm.OldPassword == nil {
-			errWriter.WriteValidationError(&ValidationError{
+			return &ValidationError{
 				"oldPassword": models.ErrRequired.Error(),
-			})
-			return
+			}
 		}
 
 		if !user.CheckPassword(*updateForm.OldPassword) {
-			errWriter.WriteValidationError(&ValidationError{
+			return &ValidationError{
 				"oldPassword": models.ErrInvalid.Error(),
-			})
-			return
+			}
 		}
 
 		user.Password = updateForm.NewPassword
 	}
 
+	// пытаемся сохранить
 	if err := user.Save(); err != nil {
 		if errors.Cause(err) == models.ErrUsernameTaken {
-			errWriter.WriteValidationError(&ValidationError{
+			return &ValidationError{
 				"username": models.ErrTaken.Error(),
-			})
-		} else {
-			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "user save error"))
+			}
 		}
-		return
+
+		return errors.Wrap(err, "user save error")
 	}
 
-	w.WriteHeader(http.StatusOK)
+	return nil
 }
 
 // CreateUser creates new user

@@ -48,3 +48,9 @@ func (fu *FormUser) Validate() *ValidationError {
 
 	return &err
 }
+
+type FormUserUpdate struct {
+	BasicUser
+	OldPassword *string `json:"oldPassword"`
+	NewPassword *string `json:"newPassword"`
+}
