@@ -1,6 +1,6 @@
 package models
 
-import "errors"
+import "github.com/pkg/errors"
 
 var (
 	// ErrInvalid у поля неправильный формат

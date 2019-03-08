@@ -29,9 +29,7 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := models.GetUser(map[string]interface{}{
-		"username": form.Username,
-	})
+	user, err := models.GetUserByUsername(*form.Username)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			logger.Warn("username not_exists")

@@ -1,6 +1,6 @@
 package controllers
 
-import "errors"
+import "github.com/pkg/errors"
 
 var (
 	// ErrBadJSON некорректный JSON

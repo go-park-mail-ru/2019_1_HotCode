@@ -34,7 +34,7 @@ func init() {
 	log.SetOutput(os.Stdout)
 
 	// собираем логи в хранилище
-	le, err := logentriesrus.NewLogentriesrusHook("e5a7a062-3136-447a-881c-62d3c9aeb351")
+	le, err := logentriesrus.NewLogentriesrusHook(os.Getenv("LOGENTRIESRUS_TOKEN"))
 	if err != nil {
 		os.Exit(-1)
 	}

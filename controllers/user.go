@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
@@ -65,9 +66,7 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.GetUser(map[string]interface{}{
-		"username": bUser.Username,
-	}) // если база лежит
+	_, err = models.GetUserByUsername(*bUser.Username) // если база лежит
 	if err != nil && errors.Cause(err) != models.ErrNotExists {
 		logger.Error(errors.Wrap(err, "get user method error"))
 		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
@@ -90,9 +89,14 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "GetUser")
 	vars := mux.Vars(r)
 
-	user, err := models.GetUser(map[string]interface{}{
-		"id": vars["user_id"],
-	})
+	userID, err := strconv.ParseInt(vars["user_id"], 10, 64)
+	if err != nil {
+		logger.Error(errors.Wrap(err, "wrong format user_id"))
+		utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(err))
+		return
+	}
+
+	user, err := models.GetUserByID(userID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			logger.Warn("user not_exists")
@@ -137,13 +141,11 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := models.GetUser(map[string]interface{}{
-		"id": info.ID,
-	})
+	user, err := models.GetUserByID(*info.ID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			logger.Warn("user not_exists")
-			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(err))
+			utils.WriteApplicationJSON(w, http.StatusUnauthorized, NewAPIError(err))
 		} else {
 			logger.Error(errors.Wrap(err, "get user method error"))
 			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
@@ -173,6 +175,8 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+
+		user.Password = updateForm.NewPassword
 	}
 
 	if err := user.Save(); err != nil {
@@ -211,7 +215,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	user := models.User{
 		Username: *form.Username,
-		Password: *form.Password,
+		Password: form.Password,
 	}
 
 	if err = user.Create(); err != nil {

@@ -11,7 +11,7 @@ import (
 type ValidationError map[string]string
 
 func (ve *ValidationError) Error() string {
-	return fmt.Sprintf("%+v", ve)
+	return fmt.Sprintf("%+v", *ve)
 }
 
 // BasicUser базовые поля

@@ -10,9 +10,9 @@ import (
 type User struct {
 	ID       int64  `gorm:"primary_key"`
 	Username string `gorm:"size:32"`
-	// строка для сохранения
-	Password string `gorm:"-"`
-	Active   bool   `gorm:"default:true"`
+	// строка для сохранения(может быть задана пустой строкой)
+	Password *string `gorm:"-"`
+	Active   bool    `gorm:"default:true"`
 	// внутренний хеш для проверки
 	PasswrodCrypt []byte `gorm:"column:password"`
 }
@@ -25,7 +25,7 @@ func (u *User) TableName() string {
 // Create создаёт запись в базе с новыми полями
 func (u *User) Create() error {
 	var err error
-	u.PasswrodCrypt, err = bcrypt.GenerateFromPassword([]byte(u.Password),
+	u.PasswrodCrypt, err = bcrypt.GenerateFromPassword([]byte(*u.Password),
 		bcrypt.MinCost)
 	if err != nil {
 		return errors.Wrap(err, "password generate error")
@@ -46,8 +46,8 @@ func (u *User) Create() error {
 
 // Save сохраняет юзера в базу
 func (u *User) Save() error {
-	if u.Password != "" {
-		newPass, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.MinCost)
+	if u.Password != nil {
+		newPass, err := bcrypt.GenerateFromPassword([]byte(*u.Password), bcrypt.MinCost)
 		if err != nil {
 			return errors.Wrap(err, "password generate error")
 		}
@@ -72,8 +72,17 @@ func (u *User) CheckPassword(password string) bool {
 	return err == nil
 }
 
-// GetUser получает юзера по данным параметрам
-func GetUser(params map[string]interface{}) (*User, error) {
+// GetUserByUsername получает юзера по id
+func GetUserByID(id int64) (*User, error) {
+	return getUser(map[string]interface{}{"id": id})
+}
+
+// GetUserByUsername получает юзера по имени
+func GetUserByUsername(username string) (*User, error) {
+	return getUser(map[string]interface{}{"username": username})
+}
+
+func getUser(params map[string]interface{}) (*User, error) {
 	u := &User{}
 	if dbc := db.Where(params).First(u); dbc.Error != nil {
 		if _, ok := dbc.Error.(*pq.Error); !ok &&

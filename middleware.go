@@ -20,6 +20,7 @@ func RecoverMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
+				log.WithField("method", "RecoverMiddleware").Error(err)
 				utils.WriteApplicationJSON(w, http.StatusInternalServerError,
 					controllers.NewAPIError(models.ErrInternal))
 			}
@@ -60,8 +61,8 @@ func AccessLogMiddleware(next http.Handler) http.Handler {
 //nolint: interfacer
 func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, _ := r.Cookie("JSESSIONID")
-		if cookie == nil {
+		cookie, err := r.Cookie("JSESSIONID")
+		if err != nil || cookie == nil {
 			utils.WriteApplicationJSON(w, http.StatusUnauthorized,
 				controllers.NewAPIError(controllers.ErrUnauthorized))
 			return
