@@ -54,7 +54,7 @@ type FormUserUpdate struct {
 	NewPassword opt.String `json:"newPassword"`
 }
 
-func (fu *FormUserUpdate) Validate() *ValidationError {
+func (fu *FormUserUpdate) Validate() error {
 	err := ValidationError{}
 	if fu.Username.IsDefined() && fu.Username.V == "" {
 		err["username"] = models.ErrInvalid.Error()
