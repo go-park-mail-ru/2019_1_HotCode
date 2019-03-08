@@ -11,6 +11,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+type SessionPayload struct {
+	ID int64
+}
+
 // CreateSession вход + кука
 func CreateSession(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "SignInUser")
@@ -68,12 +72,8 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 		}
 	}
 
-	data, err := json.Marshal(&InfoUser{
-		ID:     user.ID,
-		Active: user.Active,
-		BasicUser: BasicUser{
-			Username: user.Username,
-		},
+	data, err := json.Marshal(&SessionPayload{
+		ID: user.ID,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "info marshal error")
@@ -119,6 +119,24 @@ func DeleteSession(w http.ResponseWriter, r *http.Request) {
 
 // GetSession возвращает сессмю
 func GetSession(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "GetSession")
+	errWriter := NewErrorResponseWriter(w, logger)
 	info := UserInfo(r)
-	utils.WriteApplicationJSON(w, http.StatusOK, info)
+
+	user, err := models.GetUserByID(info.ID)
+	if err != nil {
+		if errors.Cause(err) == models.ErrNotExists {
+			errWriter.WriteWarn(http.StatusUnauthorized, errors.Wrap(err, "user not exists"))
+		} else {
+			errWriter.WriteError(http.StatusInternalServerError, err)
+		}
+	}
+
+	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
+		ID:     user.ID,
+		Active: user.Active,
+		BasicUser: BasicUser{
+			Username: user.Username,
+		},
+	})
 }

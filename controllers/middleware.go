@@ -29,15 +29,15 @@ func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 			return
 
 		}
-		user := &InfoUser{}
-		err = json.Unmarshal(session.Payload, user)
+		payload := &SessionPayload{}
+		err = json.Unmarshal(session.Payload, payload)
 		if err != nil {
 			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "session payload unmarshal error"))
 			return
 
 		}
 
-		ctx := context.WithValue(r.Context(), UserInfoKey, user)
+		ctx := context.WithValue(r.Context(), SessionInfoKey, payload)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -19,15 +19,15 @@ type ContextKey int
 const (
 	// UserInfoKey ключ, по которому в контексте
 	// реквеста хранится структура юзера после валидации
-	UserInfoKey ContextKey = 1
+	SessionInfoKey ContextKey = 1
 	// RequestUUIDKey ключ, по которому в контексте храниться его уникальный ID
 	RequestUUIDKey ContextKey = 2
 )
 
 // UserInfo достаёт инфу о юзере из контекстаs
-func UserInfo(r *http.Request) *InfoUser {
-	if rv := r.Context().Value(UserInfoKey); rv != nil {
-		if rInfo, ok := rv.(*InfoUser); ok {
+func UserInfo(r *http.Request) *SessionPayload {
+	if rv := r.Context().Value(SessionInfoKey); rv != nil {
+		if rInfo, ok := rv.(*SessionPayload); ok {
 			return rInfo
 		}
 	}
@@ -147,7 +147,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 //nolint: gocyclo
-func updateUserImpl(info *InfoUser, updateForm *FormUserUpdate) error {
+func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	if err := updateForm.Validate(); err != nil {
 		return err
 	}
