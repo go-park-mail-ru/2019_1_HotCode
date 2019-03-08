@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/controllers"
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
-	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -20,9 +18,9 @@ func RecoverMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.WithField("method", "RecoverMiddleware").Error(err)
-				utils.WriteApplicationJSON(w, http.StatusInternalServerError,
-					controllers.NewAPIError(models.ErrInternal))
+				log.WithField("method", "RECOVER").Error(err)
+				controllers.NewErrorResponseWriter(w, log.WithField("method", "RecoverMiddleware")).
+					WriteError(http.StatusInternalServerError, models.ErrInternal)
 			}
 		}()
 
@@ -47,41 +45,12 @@ func AccessLogMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// WithAuthentication проверка токена перед исполнением запроса
-//nolint: interfacer
-func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("JSESSIONID")
-		if err != nil || cookie == nil {
-			utils.WriteApplicationJSON(w, http.StatusUnauthorized,
-				controllers.NewAPIError(controllers.ErrUnauthorized))
-			return
-		}
-
-		session, err := models.GetSession(cookie.Value)
-		if err != nil {
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError, controllers.NewAPIError(err))
-			return
-
-		}
-		user := &controllers.InfoUser{}
-		err = json.Unmarshal(session.Payload, user)
-		if err != nil {
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError, controllers.NewAPIError(err))
-			return
-
-		}
-
-		ctx := context.WithValue(r.Context(), controllers.UserInfoKey, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 // WithLimiter для запросов, у которых есть ограничение в секунду
 //nolint: interfacer
 func WithLimiter(next http.HandlerFunc, limiter *rate.Limiter) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !limiter.Allow() {
+			log.WithField("method", "WithLimiter").Warn("too many requests")
 			http.Error(w, "", http.StatusTooManyRequests)
 			return
 		}

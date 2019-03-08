@@ -57,19 +57,18 @@ func getLogger(r *http.Request, funcName string) *log.Entry {
 // CheckUsername checks if username already used
 func CheckUsername(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "CheckUsername")
+	errWriter := NewErrorResponseWriter(w, logger)
 
 	bUser := &BasicUser{}
 	err := utils.DecodeBodyJSON(r.Body, bUser)
 	if err != nil {
-		logger.Warn(errors.Wrap(err, "decode body error"))
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(ErrBadJSON))
+		errWriter.WriteWarn(http.StatusBadRequest, errors.Wrap(err, "decode body error"))
 		return
 	}
 
 	_, err = models.GetUserByUsername(*bUser.Username) // если база лежит
 	if err != nil && errors.Cause(err) != models.ErrNotExists {
-		logger.Error(errors.Wrap(err, "get user method error"))
-		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
+		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
 		return
 	}
 
@@ -87,23 +86,21 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 // GetUser get user info by ID
 func GetUser(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "GetUser")
+	errWriter := NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
 	userID, err := strconv.ParseInt(vars["user_id"], 10, 64)
 	if err != nil {
-		logger.Error(errors.Wrap(err, "wrong format user_id"))
-		utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(err))
+		errWriter.WriteError(http.StatusNotFound, errors.Wrap(err, "wrong format user_id"))
 		return
 	}
 
 	user, err := models.GetUserByID(userID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
-			logger.Warn("user not_exists")
-			utils.WriteApplicationJSON(w, http.StatusNotFound, NewAPIError(err))
+			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "user not exists"))
 		} else {
-			logger.Error(errors.Wrap(err, "get user method error"))
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
+			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
 		}
 		return
 	}
@@ -120,6 +117,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 // UpdateUser обновляет данные пользователя
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "UpdateUser")
+	errWriter := NewErrorResponseWriter(w, logger)
 	info := UserInfo(r)
 
 	updateForm := &struct {
@@ -129,8 +127,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}{}
 	err := utils.DecodeBodyJSON(r.Body, updateForm)
 	if err != nil {
-		logger.Warn(errors.Wrap(err, "decode body error"))
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(ErrBadJSON))
+		errWriter.WriteWarn(http.StatusBadRequest, errors.Wrap(err, "decode body error"))
 		return
 	}
 
@@ -144,11 +141,9 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	user, err := models.GetUserByID(*info.ID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
-			logger.Warn("user not_exists")
-			utils.WriteApplicationJSON(w, http.StatusUnauthorized, NewAPIError(err))
+			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "user not exists"))
 		} else {
-			logger.Error(errors.Wrap(err, "get user method error"))
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
+			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
 		}
 		return
 	}
@@ -161,16 +156,14 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// что пользователь знает старый
 	if updateForm.NewPassword != nil {
 		if updateForm.OldPassword == nil {
-			logger.Warn("old password required")
-			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+			errWriter.WriteValidationError(&ValidationError{
 				"oldPassword": models.ErrRequired.Error(),
 			})
 			return
 		}
 
 		if !user.CheckPassword(*updateForm.OldPassword) {
-			logger.Warn("old password invalid")
-			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+			errWriter.WriteValidationError(&ValidationError{
 				"oldPassword": models.ErrInvalid.Error(),
 			})
 			return
@@ -181,13 +174,11 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := user.Save(); err != nil {
 		if errors.Cause(err) == models.ErrUsernameTaken {
-			logger.Warn("username taken")
-			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+			errWriter.WriteValidationError(&ValidationError{
 				"username": models.ErrTaken.Error(),
 			})
 		} else {
-			logger.Error(errors.Wrap(err, "user save error"))
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
+			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "user save error"))
 		}
 		return
 	}
@@ -198,18 +189,17 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 // CreateUser creates new user
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "CreateUser")
+	errWriter := NewErrorResponseWriter(w, logger)
 
 	form := &FormUser{}
 	err := utils.DecodeBodyJSON(r.Body, form)
 	if err != nil {
-		logger.Warn(errors.Wrap(err, "decode body error"))
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, NewAPIError(ErrBadJSON))
+		errWriter.WriteWarn(http.StatusBadRequest, errors.Wrap(err, "decode body error"))
 		return
 	}
 
-	if err = form.Validate(); err != nil {
-		logger.Warn(errors.Wrap(err, "invalid form"))
-		utils.WriteApplicationJSON(w, http.StatusBadRequest, err.(*ValidationError))
+	if valError := form.Validate(); valError != nil {
+		errWriter.WriteValidationError(valError)
 		return
 	}
 
@@ -220,13 +210,11 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err = user.Create(); err != nil {
 		if errors.Cause(err) == models.ErrUsernameTaken {
-			logger.Warn("username taken")
-			utils.WriteApplicationJSON(w, http.StatusBadRequest, &ValidationError{
+			errWriter.WriteValidationError(&ValidationError{
 				"username": models.ErrTaken.Error(),
 			})
 		} else {
-			logger.Error(errors.Wrap(err, "user create error"))
-			utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
+			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "user create error"))
 		}
 		return
 	}

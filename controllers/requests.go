@@ -33,7 +33,7 @@ type FormUser struct {
 }
 
 // Validate валидация полей
-func (fu *FormUser) Validate() error {
+func (fu *FormUser) Validate() *ValidationError {
 	err := ValidationError{}
 	if fu.Username == nil {
 		err["username"] = models.ErrRequired.Error()
