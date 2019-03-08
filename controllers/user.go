@@ -66,7 +66,7 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.GetUserByUsername(*bUser.Username) // если база лежит
+	_, err = models.GetUserByUsername(bUser.Username) // если база лежит
 	if err != nil && errors.Cause(err) != models.ErrNotExists {
 		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
 		return
@@ -106,10 +106,10 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
-		ID:     &user.ID,
-		Active: &user.Active,
+		ID:     user.ID,
+		Active: user.Active,
 		BasicUser: BasicUser{
-			Username: &user.Username,
+			Username: user.Username,
 		},
 	})
 }
@@ -146,39 +146,44 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+//nolint: gocyclo
 func updateUserImpl(info *InfoUser, updateForm *FormUserUpdate) error {
+	if err := updateForm.Validate(); err != nil {
+		return err
+	}
+
 	// нечего обновлять
-	if updateForm.Username == nil && updateForm.NewPassword == nil {
+	if !updateForm.Username.IsDefined() && !updateForm.NewPassword.IsDefined() {
 		return nil
 	}
 
 	// взяли юзера
-	user, err := models.GetUserByID(*info.ID)
+	user, err := models.GetUserByID(info.ID)
 	if err != nil {
 		return errors.Wrap(err, "get user error")
 	}
 
 	// хотим обновить username
-	if updateForm.Username != nil {
-		user.Username = *updateForm.Username
+	if updateForm.Username.IsDefined() {
+		user.Username = updateForm.Username.V
 	}
 
 	// Если обновляется пароль, нужно проверить,
 	// что пользователь знает старый
-	if updateForm.NewPassword != nil {
-		if updateForm.OldPassword == nil {
+	if updateForm.NewPassword.IsDefined() {
+		if !updateForm.OldPassword.IsDefined() {
 			return &ValidationError{
 				"oldPassword": models.ErrRequired.Error(),
 			}
 		}
 
-		if !user.CheckPassword(*updateForm.OldPassword) {
+		if !user.CheckPassword(updateForm.OldPassword.V) {
 			return &ValidationError{
 				"oldPassword": models.ErrInvalid.Error(),
 			}
 		}
 
-		user.Password = updateForm.NewPassword
+		user.Password = &updateForm.NewPassword.V
 	}
 
 	// пытаемся сохранить
@@ -213,8 +218,8 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := models.User{
-		Username: *form.Username,
-		Password: form.Password,
+		Username: form.Username,
+		Password: &form.Password,
 	}
 
 	if err = user.Create(); err != nil {

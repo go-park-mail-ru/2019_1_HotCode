@@ -50,7 +50,7 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 		return nil, err
 	}
 
-	user, err := models.GetUserByUsername(*form.Username)
+	user, err := models.GetUserByUsername(form.Username)
 	if err != nil {
 		return nil, errors.Wrap(err, "get user error")
 	}
@@ -62,17 +62,17 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 		}
 	}
 
-	if !user.CheckPassword(*form.Password) {
+	if !user.CheckPassword(form.Password) {
 		return nil, &ValidationError{
 			"password": models.ErrInvalid.Error(),
 		}
 	}
 
 	data, err := json.Marshal(&InfoUser{
-		ID:     &user.ID,
-		Active: &user.Active,
+		ID:     user.ID,
+		Active: user.Active,
 		BasicUser: BasicUser{
-			Username: &user.Username,
+			Username: user.Username,
 		},
 	})
 	if err != nil {

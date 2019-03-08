@@ -3,6 +3,8 @@ package controllers
 import (
 	"fmt"
 
+	"github.com/mailru/easyjson/opt"
+
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 )
 
@@ -16,30 +18,27 @@ func (ve *ValidationError) Error() string {
 
 // BasicUser базовые поля
 type BasicUser struct {
-	Username *string `json:"username"`
+	Username string `json:"username"`
 }
 
 // InfoUser BasicUser, расширенный служебной инфой
 type InfoUser struct {
 	BasicUser
-	ID     *int64 `json:"id"`
-	Active *bool  `json:"active"`
+	ID     int64 `json:"id"`
+	Active bool  `json:"active"`
 }
 
 // FormUser BasicUser, расширенный паролем, используется для входа и регистрации
 type FormUser struct {
 	BasicUser
-	Password *string `json:"password"`
+	Password string `json:"password"`
 }
 
 // Validate валидация полей
 func (fu *FormUser) Validate() *ValidationError {
 	err := ValidationError{}
-	if fu.Username == nil {
+	if fu.Username == "" {
 		err["username"] = models.ErrRequired.Error()
-	}
-	if fu.Password == nil {
-		err["password"] = models.ErrRequired.Error()
 	}
 
 	if len(err) == 0 {
@@ -50,7 +49,20 @@ func (fu *FormUser) Validate() *ValidationError {
 }
 
 type FormUserUpdate struct {
-	BasicUser
-	OldPassword *string `json:"oldPassword"`
-	NewPassword *string `json:"newPassword"`
+	Username    opt.String `json:"username"`
+	OldPassword opt.String `json:"oldPassword"`
+	NewPassword opt.String `json:"newPassword"`
+}
+
+func (fu *FormUserUpdate) Validate() *ValidationError {
+	err := ValidationError{}
+	if fu.Username.IsDefined() && fu.Username.V == "" {
+		err["username"] = models.ErrInvalid.Error()
+	}
+
+	if len(err) == 0 {
+		return nil
+	}
+
+	return &err
 }
