@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/handlers"
+
 	"golang.org/x/time/rate"
 
 	"github.com/gomodule/redigo/redis"
@@ -69,12 +71,17 @@ func main() {
 	r.HandleFunc("/users", controllers.CreateUser).Methods("POST")
 	r.HandleFunc("/users", WithAuthentication(controllers.UpdateUser)).Methods("PUT")
 	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
-	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(1, 1))).Methods("POST")
-	h.Router = CORSMiddleware(RecoverMiddleware(AccessLogMiddleware(r)))
+	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
+	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
+	corsMiddleware := handlers.CORS(
+		handlers.AllowedOrigins([]string{os.Getenv("CORS_HOST")}),
+		handlers.AllowedMethods([]string{"POST", "GET", "PUT", "DELETE"}),
+		handlers.AllowCredentials(),
+	)
 
 	port := os.Getenv("PORT")
 	log.Printf("MainService successfully started at port %s", port)
-	err = http.ListenAndServe(":"+port, h.Router)
+	err = http.ListenAndServe(":"+port, corsMiddleware(h.Router))
 	if err != nil {
 		log.Fatalf("cant start main server. err: %s", err.Error())
 		return

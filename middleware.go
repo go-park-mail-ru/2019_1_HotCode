@@ -30,16 +30,6 @@ func RecoverMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// CORSMiddleware добавляет настройки CORS в хедер
-func CORSMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "https://20191hotcode-6t88u924a.now.sh")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		next.ServeHTTP(w, r)
-	})
-}
-
 // AccessLogMiddleware логирование всех запросов
 func AccessLogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

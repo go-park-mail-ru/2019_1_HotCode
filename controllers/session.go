@@ -60,13 +60,19 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, _ := json.Marshal(&InfoUser{
+	data, err := json.Marshal(&InfoUser{
 		ID:     &user.ID,
 		Active: &user.Active,
 		BasicUser: BasicUser{
 			Username: &user.Username,
 		},
 	})
+	if err != nil {
+		logger.Error(errors.Wrap(err, "info marshal error"))
+		utils.WriteApplicationJSON(w, http.StatusInternalServerError, NewAPIError(err))
+		return
+	}
+
 	session := models.Session{
 		Payload:      data,
 		ExpiresAfter: time.Hour * 24 * 30,
