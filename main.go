@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/jcftang/logentriesrus"
 	"github.com/jinzhu/gorm"
@@ -28,7 +28,7 @@ import (
 type Handler struct {
 	Router           http.Handler
 	DBConn           *gorm.DB
-	SessionStoreConn redis.Conn
+	SessionStoreConn *redis.Client
 }
 
 func init() {

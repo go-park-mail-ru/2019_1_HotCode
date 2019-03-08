@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis"
 	"github.com/jinzhu/gorm"
 
 	// требования импорта для pq
@@ -11,7 +11,7 @@ import (
 )
 
 var db *gorm.DB
-var storage redis.Conn
+var storage *redis.Client
 
 const (
 	psqlUniqueViolation = "23505"
@@ -31,8 +31,14 @@ func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
 
 // ConnectStorage открывает соединение с хранилищем для sessions
 func ConnectStorage(storageUser, storagePass, storageHost string) error {
+	// storage, err = redis.DialURL(fmt.Sprintf("redis://%s:%s@%s", storageUser, storagePass, storageHost))
 	var err error
-	storage, err = redis.DialURL(fmt.Sprintf("redis://%s:%s@%s", storageUser, storagePass, storageHost))
+	storage = redis.NewClient(&redis.Options{
+		Addr:     storageHost,
+		Password: storagePass,
+		DB:       0,
+	})
+	_, err = storage.Ping().Result()
 	if err != nil {
 		return err
 	}
@@ -45,6 +51,6 @@ func GetDB() *gorm.DB {
 }
 
 // GetStorage returns initiated storage
-func GetStorage() redis.Conn {
+func GetStorage() *redis.Client {
 	return storage
 }
