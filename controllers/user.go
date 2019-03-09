@@ -3,6 +3,7 @@ package controllers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
@@ -239,5 +240,25 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	session, err := createSessionImpl(form)
+	if err != nil {
+		if validErr, ok := err.(*ValidationError); ok {
+			errWriter.WriteValidationError(validErr)
+			return
+		}
+
+		errWriter.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// ставим куку
+	http.SetCookie(w, &http.Cookie{
+		Name:     "JSESSIONID",
+		Value:    session.Token,
+		Expires:  time.Now().Add(2628000 * time.Second),
+		HttpOnly: true,
+	})
+
 	w.WriteHeader(http.StatusOK)
+
 }
