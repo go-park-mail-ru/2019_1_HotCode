@@ -56,7 +56,9 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 
 	user, err := models.GetUserByUsername(form.Username)
 	if err != nil {
-		return nil, errors.Wrap(err, "get user error")
+		return nil, &ValidationError{
+			"username": models.ErrNotExists.Error(),
+		}
 	}
 
 	// пользователь удалён

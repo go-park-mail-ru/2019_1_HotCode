@@ -240,6 +240,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// сразу же логиним юзера
 	session, err := createSessionImpl(form)
 	if err != nil {
 		if validErr, ok := err.(*ValidationError); ok {
