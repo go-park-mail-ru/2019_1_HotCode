@@ -108,12 +108,17 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var photoUUID string
+	if user.PhotoUUID != nil {
+		photoUUID = user.PhotoUUID.String()
+	}
+
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
 		ID:     user.ID,
 		Active: user.Active,
 		BasicUser: BasicUser{
 			Username:  user.Username,
-			PhotoUUID: user.PhotoUUID.String(),
+			PhotoUUID: photoUUID,
 		},
 	})
 }
