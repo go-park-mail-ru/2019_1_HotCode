@@ -132,6 +132,7 @@ func GetSession(w http.ResponseWriter, r *http.Request) {
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, err)
 		}
+		return
 	}
 
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{

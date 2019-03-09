@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -10,7 +11,7 @@ import (
 type User struct {
 	ID        int64  `gorm:"primary_key"`
 	Username  string `gorm:"size:32"`
-	PhotoUUID *string
+	PhotoUUID *uuid.UUID
 	// строка для сохранения(может быть задана пустой строкой)
 	Password *string `gorm:"-"`
 	Active   bool    `gorm:"default:true"`

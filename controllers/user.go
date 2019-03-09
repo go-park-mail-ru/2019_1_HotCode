@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
@@ -110,7 +112,8 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		ID:     user.ID,
 		Active: user.Active,
 		BasicUser: BasicUser{
-			Username: user.Username,
+			Username:  user.Username,
+			PhotoUUID: user.PhotoUUID.String(),
 		},
 	})
 }
@@ -172,7 +175,17 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	if updateForm.PhotoUUID.IsDefined() {
-		user.PhotoUUID = &updateForm.PhotoUUID.V
+		if updateForm.PhotoUUID.V == "" {
+			user.PhotoUUID = nil
+		} else {
+			newUUID, err := uuid.FromString(updateForm.PhotoUUID.V)
+			if err != nil {
+				return &ValidationError{
+					"photo_uuid": models.ErrInvalid.Error(),
+				}
+			}
+			user.PhotoUUID = &newUUID
+		}
 	}
 
 	// Если обновляется пароль, нужно проверить,
