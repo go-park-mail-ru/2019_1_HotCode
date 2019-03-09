@@ -8,8 +8,9 @@ import (
 
 // User model for users table
 type User struct {
-	ID       int64  `gorm:"primary_key"`
-	Username string `gorm:"size:32"`
+	ID        int64  `gorm:"primary_key"`
+	Username  string `gorm:"size:32"`
+	PhotoUUID *string
 	// строка для сохранения(может быть задана пустой строкой)
 	Password *string `gorm:"-"`
 	Active   bool    `gorm:"default:true"`

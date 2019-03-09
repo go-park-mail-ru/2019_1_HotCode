@@ -153,7 +153,9 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	// нечего обновлять
-	if !updateForm.Username.IsDefined() && !updateForm.NewPassword.IsDefined() {
+	if !updateForm.Username.IsDefined() &&
+		!updateForm.NewPassword.IsDefined() &&
+		!updateForm.PhotoUUID.IsDefined() {
 		return nil
 	}
 
@@ -166,6 +168,10 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	// хотим обновить username
 	if updateForm.Username.IsDefined() {
 		user.Username = updateForm.Username.V
+	}
+
+	if updateForm.PhotoUUID.IsDefined() {
+		user.PhotoUUID = &updateForm.PhotoUUID.V
 	}
 
 	// Если обновляется пароль, нужно проверить,

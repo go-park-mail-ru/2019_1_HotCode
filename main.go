@@ -76,6 +76,7 @@ func main() {
 	corsMiddleware := handlers.CORS(
 		handlers.AllowedOrigins([]string{os.Getenv("CORS_HOST")}),
 		handlers.AllowedMethods([]string{"POST", "GET", "PUT", "DELETE"}),
+		handlers.AllowedHeaders([]string{"Content-Type"}),
 		handlers.AllowCredentials(),
 	)
 

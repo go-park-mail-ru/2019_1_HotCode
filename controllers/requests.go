@@ -18,7 +18,8 @@ func (ve *ValidationError) Error() string {
 
 // BasicUser базовые поля
 type BasicUser struct {
-	Username string `json:"username"`
+	Username  string `json:"username"`
+	PhotoUUID string `json:"photo_uuid"`
 }
 
 // InfoUser BasicUser, расширенный служебной инфой
@@ -50,6 +51,7 @@ func (fu *FormUser) Validate() *ValidationError {
 
 type FormUserUpdate struct {
 	Username    opt.String `json:"username"`
+	PhotoUUID   opt.String `json:"photo_uuid"`
 	OldPassword opt.String `json:"oldPassword"`
 	NewPassword opt.String `json:"newPassword"`
 }
