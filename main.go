@@ -72,6 +72,10 @@ func main() {
 	r.HandleFunc("/users", controllers.WithAuthentication(controllers.UpdateUser)).Methods("PUT")
 	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
 	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
+
+	r.HandleFunc("/games/{game_id:[0-9]+}", controllers.GetGame).Methods("GET")
+	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
+
 	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 	corsMiddleware := handlers.CORS(
 		handlers.AllowedOrigins([]string{os.Getenv("CORS_HOST")}),

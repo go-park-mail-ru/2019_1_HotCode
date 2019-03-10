@@ -29,6 +29,11 @@ type InfoUser struct {
 	Active bool  `json:"active"`
 }
 
+type ScoredUser struct {
+	InfoUser
+	Score int `json:"score"`
+}
+
 // FormUser BasicUser, расширенный паролем, используется для входа и регистрации
 type FormUser struct {
 	BasicUser
@@ -67,4 +72,9 @@ func (fu *FormUserUpdate) Validate() error {
 	}
 
 	return &err
+}
+
+type Game struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
 }
