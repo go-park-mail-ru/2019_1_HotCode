@@ -73,6 +73,7 @@ func main() {
 	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
 	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
 
+	r.HandleFunc("/games", controllers.GetGameList).Methods("GET")
 	r.HandleFunc("/games/{game_id:[0-9]+}", controllers.GetGame).Methods("GET")
 	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
 
