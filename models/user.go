@@ -19,6 +19,13 @@ type User struct {
 	PasswrodCrypt []byte `gorm:"column:password"`
 }
 
+type ModelUser interface {
+	TableName() string
+	Create() error
+	Save() error
+	CheckPassword(password string) bool
+}
+
 // TableName имя таблицы
 func (u *User) TableName() string {
 	return "users"
@@ -75,18 +82,18 @@ func (u *User) CheckPassword(password string) bool {
 }
 
 // GetUserByUsername получает юзера по id
-func GetUserByID(id int64) (*User, error) {
-	return getUser(map[string]interface{}{"id": id})
+func (db *DB) GetUserByID(id int64) (ModelUser, error) {
+	return db.getUser(map[string]interface{}{"id": id})
 }
 
 // GetUserByUsername получает юзера по имени
-func GetUserByUsername(username string) (*User, error) {
-	return getUser(map[string]interface{}{"username": username})
+func (db *DB) GetUserByUsername(username string) (ModelUser, error) {
+	return db.getUser(map[string]interface{}{"username": username})
 }
 
-func getUser(params map[string]interface{}) (*User, error) {
+func (db *DB) getUser(params map[string]interface{}) (ModelUser, error) {
 	u := &User{}
-	if dbc := db.Where(params).First(u); dbc.Error != nil {
+	if dbc := db.conn.Where(params).First(u); dbc.Error != nil {
 		if _, ok := dbc.Error.(*pq.Error); !ok &&
 			(dbc.RecordNotFound() || dbc.NewRecord(u)) {
 			return nil, ErrNotExists
