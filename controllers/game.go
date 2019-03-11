@@ -40,7 +40,29 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetGameLeaderboard получает лидерборд с limit и offset
+// GetGameList returns list of games
+func GetGameList(w http.ResponseWriter, r *http.Request) {
+	logger := getLogger(r, "GetGameList")
+	errWriter := NewErrorResponseWriter(w, logger)
+
+	games, err := models.GetGameList()
+	if err != nil {
+		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get game list method error"))
+
+		return
+	}
+
+	respGames := make([]*Game, len(games))
+	for i, game := range games {
+		respGames[i] = &Game{
+			ID:    game.ID,
+			Title: game.Title,
+		}
+	}
+
+	utils.WriteApplicationJSON(w, http.StatusOK, respGames)
+}
+
 func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "GetGameLeaderboard")
 	errWriter := NewErrorResponseWriter(w, logger)

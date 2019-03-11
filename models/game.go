@@ -76,3 +76,23 @@ func GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error) 
 
 	return leaderboard, nil
 }
+
+// GetGameList returns full list of active games
+func GetGameList() ([]*Game, error) {
+	rows, err := db.DB().Query(`SELECT g.id, g.title FROM games g`)
+	if err != nil {
+		return nil, errors.Wrap(err, "get game list error")
+	}
+
+	games := make([]*Game, 0)
+	for rows.Next() {
+		game := &Game{}
+		err = rows.Scan(&game.ID, &game.Title)
+		if err != nil {
+			return nil, errors.Wrap(err, "get games scan game error")
+		}
+		games = append(games, game)
+	}
+
+	return games, nil
+}
