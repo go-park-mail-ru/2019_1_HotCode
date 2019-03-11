@@ -75,6 +75,7 @@ func main() {
 
 	r.HandleFunc("/games/{game_id:[0-9]+}", controllers.GetGame).Methods("GET")
 	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
+	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard/count", controllers.GetGameTotalPlayers).Methods("GET")
 
 	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 	corsMiddleware := handlers.CORS(
