@@ -69,7 +69,7 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.GetUserByUsername(bUser.Username) // если база лежит
+	_, err = models.Users.GetUserByUsername(bUser.Username) // если база лежит
 	if err != nil && errors.Cause(err) != models.ErrNotExists {
 		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
 		return
@@ -98,7 +98,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := models.GetUserByID(userID)
+	user, err := models.Users.GetUserByID(userID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "user not exists"))
@@ -169,7 +169,7 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	// взяли юзера
-	user, err := models.GetUserByID(info.ID)
+	user, err := models.Users.GetUserByID(info.ID)
 	if err != nil {
 		return errors.Wrap(err, "get user error")
 	}
@@ -202,7 +202,7 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 			}
 		}
 
-		if !user.CheckPassword(updateForm.OldPassword.V) {
+		if !models.Users.CheckPassword(user, updateForm.OldPassword.V) {
 			return &ValidationError{
 				"oldPassword": models.ErrInvalid.Error(),
 			}
@@ -212,7 +212,7 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	// пытаемся сохранить
-	if err := user.Save(); err != nil {
+	if err := models.Users.Save(user); err != nil {
 		if errors.Cause(err) == models.ErrUsernameTaken {
 			return &ValidationError{
 				"username": models.ErrTaken.Error(),
@@ -242,12 +242,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := models.User{
+	user := &models.User{
 		Username: form.Username,
 		Password: &form.Password,
 	}
 
-	if err = user.Create(); err != nil {
+	if err = models.Users.Create(user); err != nil {
 		if errors.Cause(err) == models.ErrUsernameTaken {
 			errWriter.WriteValidationError(&ValidationError{
 				"username": models.ErrTaken.Error(),

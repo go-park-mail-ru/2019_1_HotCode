@@ -54,7 +54,7 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 		return nil, err
 	}
 
-	user, err := models.GetUserByUsername(form.Username)
+	user, err := models.Users.GetUserByUsername(form.Username)
 	if err != nil {
 		return nil, &ValidationError{
 			"username": models.ErrNotExists.Error(),
@@ -68,7 +68,7 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 		}
 	}
 
-	if !user.CheckPassword(form.Password) {
+	if !models.Users.CheckPassword(user, form.Password) {
 		return nil, &ValidationError{
 			"password": models.ErrInvalid.Error(),
 		}
@@ -125,7 +125,7 @@ func GetSession(w http.ResponseWriter, r *http.Request) {
 	errWriter := NewErrorResponseWriter(w, logger)
 	info := UserInfo(r)
 
-	user, err := models.GetUserByID(info.ID)
+	user, err := models.Users.GetUserByID(info.ID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusUnauthorized, errors.Wrap(err, "user not exists"))

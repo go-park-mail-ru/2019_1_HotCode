@@ -19,20 +19,13 @@ type User struct {
 	PasswrodCrypt []byte `gorm:"column:password"`
 }
 
-type ModelUser interface {
-	TableName() string
-	Create() error
-	Save() error
-	CheckPassword(password string) bool
-}
-
 // TableName имя таблицы
 func (u *User) TableName() string {
 	return "users"
 }
 
 // Create создаёт запись в базе с новыми полями
-func (u *User) Create() error {
+func (us *UsersDB) Create(u *User) error {
 	var err error
 	u.PasswrodCrypt, err = bcrypt.GenerateFromPassword([]byte(*u.Password),
 		bcrypt.MinCost)
@@ -40,7 +33,7 @@ func (u *User) Create() error {
 		return errors.Wrap(err, "password generate error")
 	}
 
-	if err := db.Create(u).Error; err != nil {
+	if err := db.conn.Create(u).Error; err != nil {
 		if pqErr, ok := err.(*pq.Error); !ok {
 			return errors.Wrap(err, "user create error")
 		} else if pqErr.Code == psqlUniqueViolation {
@@ -54,7 +47,7 @@ func (u *User) Create() error {
 }
 
 // Save сохраняет юзера в базу
-func (u *User) Save() error {
+func (us *UsersDB) Save(u *User) error {
 	if u.Password != nil {
 		newPass, err := bcrypt.GenerateFromPassword([]byte(*u.Password), bcrypt.MinCost)
 		if err != nil {
@@ -64,7 +57,7 @@ func (u *User) Save() error {
 		u.PasswrodCrypt = newPass
 	}
 
-	if err := db.Save(u).Error; err != nil {
+	if err := db.conn.Save(u).Error; err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == psqlUniqueViolation {
 			return ErrUsernameTaken
 		}
@@ -76,22 +69,22 @@ func (u *User) Save() error {
 }
 
 // CheckPassword проверяет пароль у юзера и сохранённый в модели
-func (u *User) CheckPassword(password string) bool {
+func (us *UsersDB) CheckPassword(u *User, password string) bool {
 	err := bcrypt.CompareHashAndPassword(u.PasswrodCrypt, []byte(password))
 	return err == nil
 }
 
-// GetUserByUsername получает юзера по id
-func (db *DB) GetUserByID(id int64) (ModelUser, error) {
-	return db.getUser(map[string]interface{}{"id": id})
+// GetUserByID получает юзера по id
+func (us *UsersDB) GetUserByID(id int64) (*User, error) {
+	return us.getUser(map[string]interface{}{"id": id})
 }
 
 // GetUserByUsername получает юзера по имени
-func (db *DB) GetUserByUsername(username string) (ModelUser, error) {
-	return db.getUser(map[string]interface{}{"username": username})
+func (us *UsersDB) GetUserByUsername(username string) (*User, error) {
+	return us.getUser(map[string]interface{}{"username": username})
 }
 
-func (db *DB) getUser(params map[string]interface{}) (ModelUser, error) {
+func (us *UsersDB) getUser(params map[string]interface{}) (*User, error) {
 	u := &User{}
 	if dbc := db.conn.Where(params).First(u); dbc.Error != nil {
 		if _, ok := dbc.Error.(*pq.Error); !ok &&

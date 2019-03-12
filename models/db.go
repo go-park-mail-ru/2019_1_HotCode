@@ -11,18 +11,28 @@ import (
 )
 
 var db DB
+
+// Users used for all operations on users
+var Users UserAccessObject
 var storage *redis.Client
 
 const (
 	psqlUniqueViolation = "23505"
 )
 
-// ModelObserver interface of database
-type ModelObserver interface {
-	GetUserByID(id int64) (ModelUser, error)
-	GetUserByUsername(username string) (ModelUser, error)
-	getUser(params map[string]interface{}) (ModelUser, error)
+// UserAccessObject DAO for User model
+type UserAccessObject interface {
+	GetUserByID(id int64) (*User, error)
+	GetUserByUsername(username string) (*User, error)
+	getUser(params map[string]interface{}) (*User, error)
+
+	Create(u *User) error
+	Save(u *User) error
+	CheckPassword(u *User, password string) bool
 }
+
+// UsersDB implementation of UserAccessObject
+type UsersDB struct{}
 
 // DB stuct for work with db implements ModelObserver
 type DB struct {
@@ -30,15 +40,17 @@ type DB struct {
 }
 
 // ConnectDB открывает соединение с базой
-func ConnectDB(dbUser, dbPass, dbHost, dbName string) (ModelObserver, error) {
+func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
 	var err error
 	db.conn, err = gorm.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s", dbUser, dbPass, dbHost, dbName))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// выключаем, так как у нас есть своё логирование
 	db.conn.LogMode(false)
-	return &db, nil
+
+	Users = &UsersDB{}
+	return nil
 }
 
 // ConnectStorage открывает соединение с хранилищем для sessions
@@ -58,7 +70,7 @@ func ConnectStorage(storageUser, storagePass, storageHost string) error {
 
 // GetDB returns initiated database
 func GetDB() *gorm.DB {
-	return db
+	return db.conn
 }
 
 // GetStorage returns initiated storage
