@@ -11,7 +11,6 @@ import (
 type UserAccessObject interface {
 	GetUserByID(id int64) (*User, error)
 	GetUserByUsername(username string) (*User, error)
-	getUser(params map[string]interface{}) (*User, error)
 
 	Create(u *User) error
 	Save(u *User) error
