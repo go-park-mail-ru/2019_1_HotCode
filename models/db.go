@@ -11,28 +11,17 @@ import (
 )
 
 var db DB
+var storage *redis.Client
 
 // Users used for all operations on users
 var Users UserAccessObject
-var storage *redis.Client
+
+// Games used for all operations on games
+var Games GameAccessObject
 
 const (
 	psqlUniqueViolation = "23505"
 )
-
-// UserAccessObject DAO for User model
-type UserAccessObject interface {
-	GetUserByID(id int64) (*User, error)
-	GetUserByUsername(username string) (*User, error)
-	getUser(params map[string]interface{}) (*User, error)
-
-	Create(u *User) error
-	Save(u *User) error
-	CheckPassword(u *User, password string) bool
-}
-
-// UsersDB implementation of UserAccessObject
-type UsersDB struct{}
 
 // DB stuct for work with db implements ModelObserver
 type DB struct {
@@ -50,6 +39,7 @@ func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
 	db.conn.LogMode(false)
 
 	Users = &UsersDB{}
+	Games = &GamesDB{}
 	return nil
 }
 

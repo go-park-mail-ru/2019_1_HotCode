@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// GetGame gets game by id
 func GetGame(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "GetGame")
 	errWriter := NewErrorResponseWriter(w, logger)
@@ -23,7 +24,7 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	game, err := models.GetGameByID(gameID)
+	game, err := models.Games.GetGameByID(gameID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "user not exists"))
@@ -39,13 +40,12 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
-// GetGameList returns list of games 
+// GetGameList gets list of games
 func GetGameList(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "GetGameList")
 	errWriter := NewErrorResponseWriter(w, logger)
 
-	games, err := models.GetGameList()
+	games, err := models.Games.GetGameList()
 	if err != nil {
 		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get game list method error"))
 
@@ -63,6 +63,7 @@ func GetGameList(w http.ResponseWriter, r *http.Request) {
 	utils.WriteApplicationJSON(w, http.StatusOK, respGames)
 }
 
+// GetGameLeaderboard gets list of leaders in game
 func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 	logger := getLogger(r, "GetGameLeaderboard")
 	errWriter := NewErrorResponseWriter(w, logger)
@@ -84,7 +85,7 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 		offsetParam = 0
 	}
 
-	leadersModels, err := models.GetGameLeaderboardByID(gameID, limitParam, offsetParam)
+	leadersModels, err := models.Games.GetGameLeaderboardByID(gameID, limitParam, offsetParam)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "user not exists"))

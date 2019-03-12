@@ -7,6 +7,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UserAccessObject DAO for User model
+type UserAccessObject interface {
+	GetUserByID(id int64) (*User, error)
+	GetUserByUsername(username string) (*User, error)
+	getUser(params map[string]interface{}) (*User, error)
+
+	Create(u *User) error
+	Save(u *User) error
+	CheckPassword(u *User, password string) bool
+}
+
+// UsersDB implementation of UserAccessObject
+type UsersDB struct{}
+
 // User model for users table
 type User struct {
 	ID        int64  `gorm:"primary_key"`

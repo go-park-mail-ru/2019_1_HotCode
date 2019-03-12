@@ -6,22 +6,33 @@ import (
 	"github.com/pkg/errors"
 )
 
+// GameAccessObject DAO for User model
+type GameAccessObject interface {
+	GetGameByID(id int64) (*Game, error)
+	GetGameList() ([]*Game, error)
+	GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error)
+}
+
+// GamesDB implementation of GameAccessObject
+type GamesDB struct{}
+
 // Game модель для таблицы games
 type Game struct {
 	ID    int64
 	Title string
 }
 
+// ScoredUser User with score
 type ScoredUser struct {
 	User
 	Score int
 }
 
 // GetGameByID получаем инфу по игре по её ID
-func GetGameByID(id int64) (*Game, error) {
+func (gs *GamesDB) GetGameByID(id int64) (*Game, error) {
 	g := &Game{}
 	// начинаем переезд с GORM(уже созданые методы будут обновлены позже)
-	row := db.DB().QueryRow(`SELECT * FROM games WHERE id = $1`, id)
+	row := db.conn.DB().QueryRow(`SELECT * FROM games WHERE id = $1`, id)
 	if err := row.Scan(&g.ID, &g.Title); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotExists
@@ -34,8 +45,8 @@ func GetGameByID(id int64) (*Game, error) {
 }
 
 // GetGameLeaderboardByID получаем leaderboard по ID
-func GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error) {
-	rows, err := db.DB().Query(`SELECT u.id, u.username, u.photo_uuid, u.active, ug.score FROM users u
+func (gs *GamesDB) GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error) {
+	rows, err := db.conn.DB().Query(`SELECT u.id, u.username, u.photo_uuid, u.active, ug.score FROM users u
 					LEFT JOIN users_games ug on u.id = ug.user_id
 					WHERE ug.game_id = $1 ORDER BY ug.score DESC OFFSET $2 LIMIT $3;`, id, offset, limit)
 	if err != nil {
@@ -58,8 +69,8 @@ func GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error) 
 }
 
 // GetGameList returns full list of active games
-func GetGameList()([]*Game, error){
-	rows, err := db.DB().Query(`SELECT g.id, g.title FROM games g`)
+func (gs *GamesDB) GetGameList() ([]*Game, error) {
+	rows, err := db.conn.DB().Query(`SELECT g.id, g.title FROM games g`)
 	if err != nil {
 		return nil, errors.Wrap(err, "get game list error")
 	}
