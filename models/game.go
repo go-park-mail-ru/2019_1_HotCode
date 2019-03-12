@@ -9,6 +9,7 @@ import (
 // GameAccessObject DAO for User model
 type GameAccessObject interface {
 	GetGameByID(id int64) (*Game, error)
+	GetGameTotalPlayersByID(id int64) (int, error)
 	GetGameList() ([]*Game, error)
 	GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error)
 }
@@ -44,7 +45,7 @@ func (gs *GamesDB) GetGameByID(id int64) (*Game, error) {
 	return g, nil
 }
 
-func GetGameTotalPlayersByID(id int64) (int, error) {
+func (gs *GamesDB) GetGameTotalPlayersByID(id int64) (int, error) {
 	totalPlayers := 0
 	row := db.conn.DB().QueryRow(`SELECT count(*) FROM users_games WHERE game_id = $1;`, id)
 	if err := row.Scan(&totalPlayers); err != nil {
@@ -59,7 +60,7 @@ func GetGameTotalPlayersByID(id int64) (int, error) {
 }
 
 // GetGameLeaderboardByID получаем leaderboard по ID
-func GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error) {
+func (gs *GamesDB) GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error) {
 	// узнаём количество
 
 	rows, err := db.conn.DB().Query(`SELECT u.id, u.username, u.photo_uuid, u.active, ug.score FROM users u
@@ -89,7 +90,7 @@ func GetGameLeaderboardByID(id int64, limit, offset int) ([]*ScoredUser, error) 
 }
 
 // GetGameList returns full list of active games
-func GetGameList() ([]*Game, error) {
+func (gs *GamesDB) GetGameList() ([]*Game, error) {
 	rows, err := db.conn.DB().Query(`SELECT g.id, g.title FROM games g`)
 	if err != nil {
 		return nil, errors.Wrap(err, "get game list error")

@@ -124,7 +124,7 @@ func GetGameTotalPlayers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	totalCount, err := models.GetGameTotalPlayersByID(gameID)
+	totalCount, err := models.Games.GetGameTotalPlayersByID(gameID)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "game not exists"))
