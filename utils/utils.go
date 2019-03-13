@@ -29,7 +29,7 @@ func WriteApplicationJSON(w http.ResponseWriter, code int, v interface{}) {
 	if err != nil {
 		logger.Error(err)
 		code = http.StatusInternalServerError
-		respJSON = []byte(fmt.Sprintf(`"message":"%s"`, err.Error()))
+		respJSON = []byte(fmt.Sprintf(`{"message":"%s"}`, err.Error()))
 	}
 
 	w.WriteHeader(code)
