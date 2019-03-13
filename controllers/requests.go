@@ -29,9 +29,10 @@ type InfoUser struct {
 	Active bool  `json:"active"`
 }
 
+// ScoredUser инфа о юзере расширенная его баллами
 type ScoredUser struct {
 	InfoUser
-	Score int `json:"score"`
+	Score int32 `json:"score"`
 }
 
 // FormUser BasicUser, расширенный паролем, используется для входа и регистрации
@@ -47,6 +48,10 @@ func (fu *FormUser) Validate() *ValidationError {
 		err["username"] = models.ErrRequired.Error()
 	}
 
+	if fu.Password == "" {
+		err["password"] = models.ErrRequired.Error()
+	}
+
 	if len(err) == 0 {
 		return nil
 	}
@@ -54,6 +59,7 @@ func (fu *FormUser) Validate() *ValidationError {
 	return &err
 }
 
+// FormUserUpdate форма для обновления полей
 type FormUserUpdate struct {
 	Username    opt.String `json:"username"`
 	PhotoUUID   opt.String `json:"photo_uuid"`
@@ -61,10 +67,15 @@ type FormUserUpdate struct {
 	NewPassword opt.String `json:"newPassword"`
 }
 
+// Validate валидация формы
 func (fu *FormUserUpdate) Validate() error {
 	err := ValidationError{}
 	if fu.Username.IsDefined() && fu.Username.V == "" {
 		err["username"] = models.ErrInvalid.Error()
+	}
+
+	if fu.NewPassword.IsDefined() && fu.NewPassword.V == "" {
+		err["newPassword"] = models.ErrInvalid.Error()
 	}
 
 	if len(err) == 0 {
@@ -74,6 +85,7 @@ func (fu *FormUserUpdate) Validate() error {
 	return &err
 }
 
+// Game схема объекта игра
 type Game struct {
 	ID    int64  `json:"id"`
 	Title string `json:"title"`
