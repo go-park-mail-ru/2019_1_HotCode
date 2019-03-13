@@ -1,13 +1,12 @@
 package models
 
 import (
-	"fmt"
+	"strconv"
 
 	"github.com/go-redis/redis"
-	"github.com/jinzhu/gorm"
+	"github.com/pkg/errors"
 
-	// требования импорта для pq
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx"
 )
 
 var db DB
@@ -19,24 +18,33 @@ var Users UserAccessObject
 // Games used for all operations on games
 var Games GameAccessObject
 
-const (
-	psqlUniqueViolation = "23505"
-)
-
 // DB stuct for work with db implements ModelObserver
 type DB struct {
-	conn *gorm.DB
+	conn *pgx.Conn
+}
+
+type queryer interface {
+	QueryRow(string, ...interface{}) *pgx.Row
 }
 
 // ConnectDB открывает соединение с базой
-func ConnectDB(dbUser, dbPass, dbHost, dbName string) error {
+func ConnectDB(dbUser, dbPass, dbHost, dbPort, dbName string) error {
 	var err error
-	db.conn, err = gorm.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s", dbUser, dbPass, dbHost, dbName))
+	port, err := strconv.ParseInt(dbPort, 10, 16)
+	if err != nil {
+		return errors.Wrap(err, "port int parse error")
+	}
+
+	db.conn, err = pgx.Connect(pgx.ConnConfig{
+		Host:     dbHost,
+		User:     dbUser,
+		Password: dbPass,
+		Database: dbName,
+		Port:     uint16(port),
+	})
 	if err != nil {
 		return err
 	}
-	// выключаем, так как у нас есть своё логирование
-	db.conn.LogMode(false)
 
 	Users = &UsersDB{}
 	Games = &GamesDB{}
@@ -56,14 +64,4 @@ func ConnectStorage(storageUser, storagePass, storageHost string) error {
 		return err
 	}
 	return nil
-}
-
-// GetDB returns initiated database
-func GetDB() *gorm.DB {
-	return db.conn
-}
-
-// GetStorage returns initiated storage
-func GetStorage() *redis.Client {
-	return storage
 }

@@ -8,10 +8,8 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"github.com/jcftang/logentriesrus"
-	"github.com/jinzhu/gorm"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/controllers"
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
@@ -26,9 +24,7 @@ import (
 // Handler пока что только хранит темплейты
 // потом можно добавить grpc клиенты
 type Handler struct {
-	Router           http.Handler
-	DBConn           *gorm.DB
-	SessionStoreConn *redis.Client
+	Router http.Handler
 }
 
 func init() {
@@ -45,7 +41,7 @@ func init() {
 
 func main() {
 	err := models.ConnectDB(os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
-		os.Getenv("DB_HOST"), os.Getenv("DB_NAME"))
+		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"))
 	if err != nil {
 		log.Fatalf("failed to connect to db; err: %s", err.Error())
 	}
@@ -56,10 +52,7 @@ func main() {
 	}
 
 	// setting templates
-	h := &Handler{
-		DBConn:           models.GetDB(),
-		SessionStoreConn: models.GetStorage(),
-	}
+	h := &Handler{}
 
 	// этот роутер будет отвечать за первую(и пока единственную) версию апишки
 	r := mux.NewRouter().PathPrefix("/v1").Subrouter()

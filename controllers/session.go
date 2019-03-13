@@ -11,8 +11,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// SessionPayload структура, которая хранится в session storage
 type SessionPayload struct {
-	ID int64
+	ID int64 `json:"id"`
 }
 
 // CreateSession вход + кука
@@ -62,7 +63,7 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 	}
 
 	// пользователь удалён
-	if !user.Active {
+	if !user.Active.Bool {
 		return nil, &ValidationError{
 			"username": models.ErrNotExists.Error(),
 		}
@@ -75,7 +76,7 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 	}
 
 	data, err := json.Marshal(&SessionPayload{
-		ID: user.ID,
+		ID: user.ID.Int,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "info marshal error")
@@ -135,17 +136,12 @@ func GetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var photoUUID string
-	if user.PhotoUUID != nil {
-		photoUUID = user.PhotoUUID.String()
-	}
-
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
-		ID:     user.ID,
-		Active: user.Active,
+		ID:     user.ID.Int,
+		Active: user.Active.Bool,
 		BasicUser: BasicUser{
-			Username:  user.Username,
-			PhotoUUID: photoUUID,
+			Username:  user.Username.String,
+			PhotoUUID: user.PhotoUUID.String,
 		},
 	})
 }
