@@ -19,6 +19,9 @@ var Users UserAccessObject
 // Games used for all operations on games
 var Games GameAccessObject
 
+// Sessions used for all operations on sessions
+var Sessions SessionAccessObject
+
 const (
 	psqlUniqueViolation = "23505"
 )
@@ -55,6 +58,8 @@ func ConnectStorage(storageUser, storagePass, storageHost string) error {
 	if err != nil {
 		return err
 	}
+
+	Sessions = &SessionsDB{}
 	return nil
 }
 

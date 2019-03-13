@@ -85,7 +85,7 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 		Payload:      data,
 		ExpiresAfter: time.Hour * 24 * 30,
 	}
-	err = session.Set()
+	err = models.Sessions.Set(session)
 	if err != nil {
 		return nil, errors.Wrap(err, "set session error")
 	}
@@ -100,14 +100,14 @@ func DeleteSession(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie("JSESSIONID")
 	if err != nil {
-		errWriter.WriteWarn(http.StatusInternalServerError, errors.Wrap(err, "get cookie error"))
+		errWriter.WriteWarn(http.StatusUnauthorized, errors.Wrap(err, "get cookie error"))
 		return
 	}
 
-	session := models.Session{
+	session := &models.Session{
 		Token: cookie.Value,
 	}
-	err = session.Delete()
+	err = models.Sessions.Delete(session)
 	if err != nil {
 		errWriter.WriteWarn(http.StatusInternalServerError, errors.Wrap(err, "session delete error"))
 		return
