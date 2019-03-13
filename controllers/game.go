@@ -35,8 +35,8 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteApplicationJSON(w, http.StatusOK, &Game{
-		ID:    game.ID,
-		Title: game.Title,
+		ID:    game.ID.Int,
+		Title: game.Title.String,
 	})
 }
 
@@ -55,8 +55,8 @@ func GetGameList(w http.ResponseWriter, r *http.Request) {
 	respGames := make([]*Game, len(games))
 	for i, game := range games {
 		respGames[i] = &Game{
-			ID:    game.ID,
-			Title: game.Title,
+			ID:    game.ID.Int,
+			Title: game.Title.String,
 		}
 	}
 
@@ -100,12 +100,12 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 		leaders[i] = &ScoredUser{
 			InfoUser: InfoUser{
 				BasicUser: BasicUser{
-					Username: leader.Username,
+					Username: leader.Username.String,
 				},
-				ID:     leader.ID,
-				Active: leader.Active,
+				ID:     leader.ID.Int,
+				Active: leader.Active.Bool,
 			},
-			Score: leader.Score,
+			Score: leader.Score.Int,
 		}
 	}
 
@@ -135,7 +135,7 @@ func GetGameTotalPlayers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteApplicationJSON(w, http.StatusOK, &struct {
-		Count int `json:"count"`
+		Count int64 `json:"count"`
 	}{
 		Count: totalCount,
 	})

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/pgtype"
+
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
@@ -20,7 +22,7 @@ import (
 type ContextKey int
 
 const (
-	// UserInfoKey ключ, по которому в контексте
+	// SessionInfoKey ключ, по которому в контексте
 	// реквеста хранится структура юзера после валидации
 	SessionInfoKey ContextKey = 1
 	// RequestUUIDKey ключ, по которому в контексте храниться его уникальный ID
@@ -108,17 +110,12 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var photoUUID string
-	if user.PhotoUUID != nil {
-		photoUUID = user.PhotoUUID.String()
-	}
-
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
-		ID:     user.ID,
-		Active: user.Active,
+		ID:     user.ID.Int,
+		Active: user.Active.Bool,
 		BasicUser: BasicUser{
-			Username:  user.Username,
-			PhotoUUID: photoUUID,
+			Username:  user.Username.String,
+			PhotoUUID: user.PhotoUUID.String,
 		},
 	})
 }
@@ -176,20 +173,25 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 
 	// хотим обновить username
 	if updateForm.Username.IsDefined() {
-		user.Username = updateForm.Username.V
+		user.Username = pgtype.Varchar{
+			String: updateForm.Username.V,
+			Status: pgtype.Present,
+		}
 	}
 
 	if updateForm.PhotoUUID.IsDefined() {
-		if updateForm.PhotoUUID.V == "" {
-			user.PhotoUUID = nil
-		} else {
-			newUUID, err := uuid.FromString(updateForm.PhotoUUID.V)
+		if updateForm.PhotoUUID.V != "" {
+			_, err := uuid.FromString(updateForm.PhotoUUID.V)
 			if err != nil {
 				return &ValidationError{
 					"photo_uuid": models.ErrInvalid.Error(),
 				}
 			}
-			user.PhotoUUID = &newUUID
+		}
+
+		user.PhotoUUID = pgtype.Text{
+			String: updateForm.PhotoUUID.V,
+			Status: pgtype.Present,
 		}
 	}
 
@@ -243,7 +245,10 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := &models.User{
-		Username: form.Username,
+		Username: pgtype.Varchar{
+			String: form.Username,
+			Status: pgtype.Present,
+		},
 		Password: &form.Password,
 	}
 
