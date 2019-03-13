@@ -101,7 +101,7 @@ func DeleteSession(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie("JSESSIONID")
 	if err != nil {
-		errWriter.WriteWarn(http.StatusInternalServerError, errors.Wrap(err, "get cookie error"))
+		errWriter.WriteWarn(http.StatusUnauthorized, errors.Wrap(err, "get cookie error"))
 		return
 	}
 
