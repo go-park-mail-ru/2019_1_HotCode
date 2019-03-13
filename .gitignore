@@ -5,3 +5,5 @@ depricated
 2019_1_HotCode
 Godeps
 vendor
+cover.out
+coverage.html
