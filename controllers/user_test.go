@@ -9,13 +9,20 @@ import (
 	"testing"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
+
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/pgtype"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/pkg/errors"
+
+	log "github.com/sirupsen/logrus"
 )
 
-var nextFail error
+func init() {
+	// чтобы не заваливать всё логами
+	log.SetLevel(log.PanicLevel)
+}
 
 type UsersTest struct {
 	users    map[int64]models.User
@@ -51,9 +58,9 @@ func (us *UsersTest) Create(u *models.User) error {
 	if err := checkFailureUser(); err != nil {
 		return err
 	}
-	u.Active = true
-	u.ID = newID()
-	us.users[u.ID] = *u
+	u.Active = pgtype.Bool{Bool: true, Status: pgtype.Present}
+	u.ID = pgtype.Int8{Int: newID(), Status: pgtype.Present}
+	us.users[u.ID.Int] = *u
 	return nil
 }
 
@@ -63,7 +70,7 @@ func (us *UsersTest) Save(u *models.User) error {
 		return err
 	}
 
-	us.users[u.ID] = *u
+	us.users[u.ID.Int] = *u
 	return nil
 }
 
@@ -95,7 +102,7 @@ func (us *UsersTest) GetUserByUsername(username string) (*models.User, error) {
 	var ok bool
 
 	for _, user := range us.users {
-		if user.Username == username {
+		if user.Username.String == username {
 			ok = true
 			u = user
 		}
@@ -225,7 +232,8 @@ func runAPITest(t *testing.T, i int, c *Case) {
 	resp := makeRequest(c.Context, r, c.Method, c.Endpoint,
 		nil, bytes.NewBuffer(c.Payload))
 	if resp.Code != c.ExpectedCode {
-		t.Fatalf("\n[%d] Expected response code %d Got %d\n\n[%d] Expected response:\n %s\n Got:\n %s\n", i, c.ExpectedCode, resp.Code, i, c.ExpectedBody, resp.Body.String())
+		t.Fatalf("\n[%d] Expected response code %d Got %d\n\n[%d] Expected response:\n %s\n Got:\n %s\n",
+			i, c.ExpectedCode, resp.Code, i, c.ExpectedBody, resp.Body.String())
 	}
 
 	if resp.Body.String() != c.ExpectedBody {
@@ -254,7 +262,7 @@ func TestCreateUser(t *testing.T) {
 	initTests()
 
 	cases := []*Case{
-		{ //Всё ок
+		{ // Всё ок
 			Payload:      []byte(`{"username":"sdas","password":"dsadasd"}`),
 			ExpectedCode: 200,
 			ExpectedBody: ``,
@@ -279,10 +287,10 @@ func TestCreateUser(t *testing.T) {
 			Pattern:      "/users",
 			Function:     CreateUser,
 		},
-		{ // Пустой пароль нас не смущает  TODO: сделать пустой пароль более развратным
+		{ // Пустой пароль теперь нас очень смущает
 			Payload:      []byte(`{"username":"kek","password":""}`),
-			ExpectedCode: 200,
-			ExpectedBody: ``,
+			ExpectedCode: 400,
+			ExpectedBody: `{"password":"required"}`,
 			Method:       "POST",
 			Pattern:      "/users",
 			Function:     CreateUser,
@@ -304,7 +312,7 @@ func TestUpdateUser(t *testing.T) {
 	initTests()
 
 	cases := []*Case{
-		{ //Такого юзера пока нет
+		{ // Такого юзера пока нет
 			Payload:      []byte(`{"username":"kek","password":"lol"}`),
 			ExpectedCode: 401,
 			ExpectedBody: `{"message":"user not exists: get user error: not_exists"}`,
@@ -368,7 +376,8 @@ func TestUpdateUser(t *testing.T) {
 			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1}),
 		},
 		{
-			Payload:      []byte(`{"username":"kek", "oldPassword":"lol", "newPassword":"lol1", "photo_uuid":"2eb4a823-3a6d-4cba-8767-4d4946890f4f"}`),
+			Payload: []byte(`{"username":"kek", "oldPassword":"lol", "newPassword":"lol1",
+			 					"photo_uuid":"2eb4a823-3a6d-4cba-8767-4d4946890f4f"}`),
 			ExpectedCode: 200,
 			ExpectedBody: ``,
 			Method:       "PUT",
@@ -385,7 +394,7 @@ func TestCheckUsername(t *testing.T) {
 	initTests()
 
 	cases := []*Case{
-		{ //Всё ок
+		{ // Всё ок
 			Payload:      []byte(`{"username":"sdas"}`),
 			ExpectedCode: 200,
 			ExpectedBody: `{"used":false}`,
@@ -451,7 +460,7 @@ func TestGetUser(t *testing.T) {
 			Pattern:      "/users",
 			Function:     CreateUser,
 		},
-		{ //Всё ок
+		{ // Всё ок
 			ExpectedCode: 200,
 			ExpectedBody: `{"username":"golang","photo_uuid":"","id":1,"active":true}`,
 			Method:       "GET",
