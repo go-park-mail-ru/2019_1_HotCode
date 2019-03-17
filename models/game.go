@@ -121,6 +121,7 @@ func (gs *GamesDB) GetGameList() ([]*Game, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "get game list error")
 	}
+	defer rows.Close()
 
 	games := make([]*Game, 0)
 	for rows.Next() {

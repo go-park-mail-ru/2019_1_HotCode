@@ -21,8 +21,7 @@ import (
 // docker kill $(docker ps -q)
 // docker rm $(docker ps -a -q)
 
-// Handler пока что только хранит темплейты
-// потом можно добавить grpc клиенты
+// Handler dependency injection для роутера
 type Handler struct {
 	Router http.Handler
 }

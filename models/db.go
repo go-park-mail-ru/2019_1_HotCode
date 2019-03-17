@@ -20,7 +20,7 @@ var Games GameAccessObject
 
 // DB stuct for work with db implements ModelObserver
 type DB struct {
-	conn *pgx.Conn
+	conn *pgx.ConnPool
 }
 
 type queryer interface {
@@ -35,12 +35,14 @@ func ConnectDB(dbUser, dbPass, dbHost, dbPort, dbName string) error {
 		return errors.Wrap(err, "port int parse error")
 	}
 
-	db.conn, err = pgx.Connect(pgx.ConnConfig{
-		Host:     dbHost,
-		User:     dbUser,
-		Password: dbPass,
-		Database: dbName,
-		Port:     uint16(port),
+	db.conn, err = pgx.NewConnPool(pgx.ConnPoolConfig{
+		ConnConfig: pgx.ConnConfig{
+			Host:     dbHost,
+			User:     dbUser,
+			Password: dbPass,
+			Database: dbName,
+			Port:     uint16(port),
+		},
 	})
 	if err != nil {
 		return err
