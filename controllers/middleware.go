@@ -23,7 +23,7 @@ func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		session, err := models.GetSession(cookie.Value)
+		session, err := models.Sessions.GetSession(cookie.Value)
 		if err != nil {
 			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get session error"))
 			return

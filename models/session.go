@@ -7,6 +7,16 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+// SessionAccessObject DAO for Session model
+type SessionAccessObject interface {
+	Set(s *Session) error
+	Delete(s *Session) error
+	GetSession(token string) (*Session, error)
+}
+
+// SessionsDB implementation of SessionAccessObject
+type SessionsDB struct{}
+
 // Session модель для работы с сессиями
 type Session struct {
 	Token        string
@@ -16,7 +26,7 @@ type Session struct {
 
 // Set валидирует и сохраняет сессию в хранилище по сгенерированному токену
 // Токен сохраняется в s.Token
-func (s *Session) Set() error {
+func (ss *SessionsDB) Set(s *Session) error {
 	sessionToken, err := uuid.NewV4()
 	if err != nil {
 		return errors.Wrap(err, "session token generate error")
@@ -32,7 +42,7 @@ func (s *Session) Set() error {
 }
 
 // Delete удаляет сессию с токен s.Token из хранилища
-func (s *Session) Delete() error {
+func (ss *SessionsDB) Delete(s *Session) error {
 	err := storage.Del(s.Token).Err()
 	if err != nil {
 		return errors.Wrap(err, "redis delete error")
@@ -42,7 +52,7 @@ func (s *Session) Delete() error {
 }
 
 // GetSession получает сессию из хранилища по токену
-func GetSession(token string) (*Session, error) {
+func (ss *SessionsDB) GetSession(token string) (*Session, error) {
 	data, err := storage.Get(token).Bytes()
 	if err != nil {
 		return nil, errors.Wrap(err, "redis get error")

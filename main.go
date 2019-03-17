@@ -26,6 +26,31 @@ type Handler struct {
 	Router http.Handler
 }
 
+// NewHandler creates new handler
+func NewHandler() *Handler {
+	h := &Handler{}
+
+	// этот роутер будет отвечать за первую(и пока единственную) версию апишки
+	r := mux.NewRouter().PathPrefix("/v1").Subrouter()
+
+	r.HandleFunc("/sessions", controllers.WithAuthentication(controllers.GetSession)).Methods("GET")
+	r.HandleFunc("/sessions", controllers.CreateSession).Methods("POST")
+	r.HandleFunc("/sessions", controllers.WithAuthentication(controllers.DeleteSession)).Methods("DELETE")
+
+	r.HandleFunc("/users", controllers.CreateUser).Methods("POST")
+	r.HandleFunc("/users", controllers.WithAuthentication(controllers.UpdateUser)).Methods("PUT")
+	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
+	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
+
+	r.HandleFunc("/games", controllers.GetGameList).Methods("GET")
+	r.HandleFunc("/games/{game_id:[0-9]+}", controllers.GetGame).Methods("GET")
+	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
+	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard/count", controllers.GetGameTotalPlayers).Methods("GET")
+
+	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
+	return h
+}
+
 func init() {
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(os.Stdout)
@@ -50,27 +75,8 @@ func main() {
 		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
 	}
 
-	// setting templates
-	h := &Handler{}
+	h := NewHandler()
 
-	// этот роутер будет отвечать за первую(и пока единственную) версию апишки
-	r := mux.NewRouter().PathPrefix("/v1").Subrouter()
-
-	r.HandleFunc("/sessions", controllers.WithAuthentication(controllers.GetSession)).Methods("GET")
-	r.HandleFunc("/sessions", controllers.CreateSession).Methods("POST")
-	r.HandleFunc("/sessions", controllers.WithAuthentication(controllers.DeleteSession)).Methods("DELETE")
-
-	r.HandleFunc("/users", controllers.CreateUser).Methods("POST")
-	r.HandleFunc("/users", controllers.WithAuthentication(controllers.UpdateUser)).Methods("PUT")
-	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
-	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
-
-	r.HandleFunc("/games", controllers.GetGameList).Methods("GET")
-	r.HandleFunc("/games/{game_id:[0-9]+}", controllers.GetGame).Methods("GET")
-	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
-	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard/count", controllers.GetGameTotalPlayers).Methods("GET")
-
-	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 	corsMiddleware := handlers.CORS(
 		handlers.AllowedOrigins([]string{os.Getenv("CORS_HOST")}),
 		handlers.AllowedMethods([]string{"POST", "GET", "PUT", "DELETE"}),
