@@ -16,6 +16,8 @@
 
 ## Ссылка на игру
 
+[[Warsciprt]](https://warscript.now.sh/dist/)
+
 ## Репозиторий фронтенда
 
 [Фронтенд](https://github.com/frontend-park-mail-ru/2019_1_HotCode)
