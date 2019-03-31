@@ -337,7 +337,7 @@ func TestUpdateUser(t *testing.T) {
 			Method:       "PUT",
 			Pattern:      "/users",
 			Function:     UpdateUser,
-			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1}),
+			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1, 1}),
 		},
 		{ // Неправильный формат JSON
 			Payload:      []byte(`{"username":"kek""}`),
@@ -355,7 +355,7 @@ func TestUpdateUser(t *testing.T) {
 			Method:       "PUT",
 			Pattern:      "/users",
 			Function:     UpdateUser,
-			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1}),
+			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1, 1}),
 		},
 		{
 			Payload:      []byte(`{"username":"kek", "oldPassword":"hh", "newPassword":"lol"}`),
@@ -364,7 +364,7 @@ func TestUpdateUser(t *testing.T) {
 			Method:       "PUT",
 			Pattern:      "/users",
 			Function:     UpdateUser,
-			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1}),
+			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1, 1}),
 		},
 		{
 			Payload:      []byte(`{"username":"kek", "photo_uuid":"ne photoUUID"}`),
@@ -373,7 +373,7 @@ func TestUpdateUser(t *testing.T) {
 			Method:       "PUT",
 			Pattern:      "/users",
 			Function:     UpdateUser,
-			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1}),
+			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1, 1}),
 		},
 		{
 			Payload: []byte(`{"username":"kek", "oldPassword":"lol", "newPassword":"lol1",
@@ -383,7 +383,7 @@ func TestUpdateUser(t *testing.T) {
 			Method:       "PUT",
 			Pattern:      "/users",
 			Function:     UpdateUser,
-			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1}),
+			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1, 1}),
 		},
 	}
 
@@ -500,7 +500,7 @@ func TestSession(t *testing.T) {
 			Method:       "POST",
 			Pattern:      "/sessions",
 			Function:     GetSession,
-			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1}),
+			Context:      context.WithValue(context.Background(), SessionInfoKey, &SessionPayload{1, 1}),
 		},
 		{
 			Payload:      []byte(``),

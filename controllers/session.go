@@ -16,7 +16,8 @@ import (
 
 // SessionPayload структура, которая хранится в session storage
 type SessionPayload struct {
-	ID int64 `json:"id"`
+	ID     int64 `json:"id"`
+	PwdVer int64 `json:"pwd_ver"`
 }
 
 // CreateSession вход + кука
@@ -79,7 +80,8 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 	}
 
 	data, err := json.Marshal(&SessionPayload{
-		ID: user.ID.Int,
+		ID:     user.ID.Int,
+		PwdVer: user.PwdVer.Int,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "info marshal error")
