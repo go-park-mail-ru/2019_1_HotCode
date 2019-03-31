@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
@@ -18,13 +20,7 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 	errWriter := NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
-	gameID, err := strconv.ParseInt(vars["game_id"], 10, 64)
-	if err != nil {
-		errWriter.WriteError(http.StatusNotFound, errors.Wrap(err, "wrong format game_id"))
-		return
-	}
-
-	game, err := models.Games.GetGameByID(gameID)
+	game, err := models.Games.GetGameBySlug(vars["game_slug"])
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "game not exists"))
@@ -34,9 +30,16 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteApplicationJSON(w, http.StatusOK, &Game{
-		ID:    game.ID.Int,
-		Title: game.Title.String,
+	utils.WriteApplicationJSON(w, http.StatusOK, &GameFull{
+		Game: Game{
+			Slug:           game.Slug.String,
+			Title:          game.Title.String,
+			BackgroundUUID: uuid.UUID(game.BackgroundUUID.Bytes).String(), // точно 16 байт
+		},
+		Description: game.Description.String,
+		Rules:       game.Rules.String,
+		CodeExample: game.CodeExample.String,
+		LogoUUID:    uuid.UUID(game.LogoUUID.Bytes).String(), // точно 16 байт
 	})
 }
 
@@ -55,8 +58,9 @@ func GetGameList(w http.ResponseWriter, r *http.Request) {
 	respGames := make([]*Game, len(games))
 	for i, game := range games {
 		respGames[i] = &Game{
-			ID:    game.ID.Int,
-			Title: game.Title.String,
+			Slug:           game.Slug.String,
+			Title:          game.Title.String,
+			BackgroundUUID: uuid.UUID(game.BackgroundUUID.Bytes).String(), // точно 16 байт
 		}
 	}
 
@@ -69,12 +73,6 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 	errWriter := NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
-	gameID, err := strconv.ParseInt(vars["game_id"], 10, 64)
-	if err != nil {
-		errWriter.WriteError(http.StatusNotFound, errors.Wrap(err, "wrong format game_id"))
-		return
-	}
-
 	query := r.URL.Query()
 	limitParam, err := strconv.Atoi(query.Get("limit"))
 	if err != nil {
@@ -85,7 +83,7 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 		offsetParam = 0
 	}
 
-	leadersModels, err := models.Games.GetGameLeaderboardByID(gameID, limitParam, offsetParam)
+	leadersModels, err := models.Games.GetGameLeaderboardBySlug(vars["game_slug"], limitParam, offsetParam)
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "game not exists or offset is large"))
@@ -118,13 +116,7 @@ func GetGameTotalPlayers(w http.ResponseWriter, r *http.Request) {
 	errWriter := NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
-	gameID, err := strconv.ParseInt(vars["game_id"], 10, 64)
-	if err != nil {
-		errWriter.WriteError(http.StatusNotFound, errors.Wrap(err, "wrong format game_id"))
-		return
-	}
-
-	totalCount, err := models.Games.GetGameTotalPlayersByID(gameID)
+	totalCount, err := models.Games.GetGameTotalPlayersBySlug(vars["game_slug"])
 	if err != nil {
 		if errors.Cause(err) == models.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "game not exists"))

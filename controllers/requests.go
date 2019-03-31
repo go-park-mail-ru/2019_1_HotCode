@@ -92,8 +92,17 @@ func (fu *FormUserUpdate) Validate() error {
 	return &err
 }
 
-// Game схема объекта игра
+// Game схема объекта игры для карусельки
 type Game struct {
-	ID    int64  `json:"id"`
-	Title string `json:"title"`
+	Slug           string `json:"slug"`
+	Title          string `json:"title"`
+	BackgroundUUID string `json:"background_uuid"`
+}
+
+type GameFull struct {
+	Game
+	Description string `json:"description"`
+	Rules       string `json:"rules"`
+	CodeExample string `json:"code_example"`
+	LogoUUID    string `json:"logo_uuid"`
 }

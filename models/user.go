@@ -34,11 +34,6 @@ type User struct {
 	PasswordCrypt pgtype.Bytea // внутренний хеш для проверки
 }
 
-// TableName Имя таблицы
-func (u *User) TableName() string {
-	return "users"
-}
-
 // Create создаёт запись в базе с новыми полями
 func (us *UsersDB) Create(u *User) error {
 	var err error
@@ -65,7 +60,7 @@ func (us *UsersDB) Create(u *User) error {
 		return errors.Wrap(err, "select duplicate errors")
 	}
 
-	_, err = tx.Exec(`INSERT INTO `+u.TableName()+` (username, password) VALUES($1, $2);`, &u.Username, &u.PasswordCrypt)
+	_, err = tx.Exec(`INSERT INTO users (username, password) VALUES($1, $2);`, &u.Username, &u.PasswordCrypt)
 	if err != nil {
 		return errors.Wrap(err, "user create error")
 	}
@@ -104,7 +99,7 @@ func (us *UsersDB) Save(u *User) error {
 		return errors.Wrap(err, "get user save error")
 	}
 
-	_, err = tx.Exec(`UPDATE `+u.TableName()+` SET (username, password, photo_uuid, active) = (
+	_, err = tx.Exec(`UPDATE users SET (username, password, photo_uuid, active) = (
 		COALESCE($1, username),
 		COALESCE($2, password),
 		$3,
@@ -162,7 +157,8 @@ func (us *UsersDB) GetUserByUsername(username string) (*User, error) {
 func (us *UsersDB) getUserImpl(q queryer, field, value string) (*User, error) {
 	u := &User{}
 
-	row := q.QueryRow(`SELECT * FROM `+u.TableName()+` WHERE `+field+` = $1;`, value)
+	row := q.QueryRow(`SELECT u.id, u.username, u.password,
+	 					u.active, u.photo_uuid FROM users u WHERE `+field+` = $1;`, value)
 	if err := row.Scan(&u.ID, &u.Username, &u.PasswordCrypt, &u.Active, &u.PhotoUUID); err != nil {
 		return nil, err
 	}

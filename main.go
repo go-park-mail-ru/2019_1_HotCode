@@ -43,9 +43,9 @@ func NewHandler() *Handler {
 	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
 
 	r.HandleFunc("/games", controllers.GetGameList).Methods("GET")
-	r.HandleFunc("/games/{game_id:[0-9]+}", controllers.GetGame).Methods("GET")
-	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
-	r.HandleFunc("/games/{game_id:[0-9]+}/leaderboard/count", controllers.GetGameTotalPlayers).Methods("GET")
+	r.HandleFunc("/games/{game_slug}", controllers.GetGame).Methods("GET")
+	r.HandleFunc("/games/{game_slug}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
+	r.HandleFunc("/games/{game_slug}/leaderboard/count", controllers.GetGameTotalPlayers).Methods("GET")
 
 	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 	return h
