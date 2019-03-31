@@ -28,7 +28,7 @@ type UsersDB struct{}
 type User struct {
 	ID            pgtype.Int8
 	Username      pgtype.Varchar
-	PhotoUUID     pgtype.Text
+	PhotoUUID     pgtype.UUID
 	Password      *string // строка для сохранения
 	Active        pgtype.Bool
 	PasswordCrypt pgtype.Bytea // внутренний хеш для проверки
@@ -107,11 +107,11 @@ func (us *UsersDB) Save(u *User) error {
 	_, err = tx.Exec(`UPDATE `+u.TableName()+` SET (username, password, photo_uuid, active) = (
 		COALESCE($1, username),
 		COALESCE($2, password),
-		COALESCE($3, photo_uuid),									
+		$3,
 		COALESCE($4, active)
-		)								
+		)
 		WHERE id = $5;`,
-		&u.Username, &u.PasswordCrypt, u.PhotoUUID.String, &u.Active, &u.ID)
+		&u.Username, &u.PasswordCrypt, &u.PhotoUUID, &u.Active, &u.ID)
 	if err != nil {
 		return errors.Wrap(err, "user save error")
 	}

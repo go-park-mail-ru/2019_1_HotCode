@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/mailru/easyjson/opt"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
@@ -76,6 +77,12 @@ func (fu *FormUserUpdate) Validate() error {
 
 	if fu.NewPassword.IsDefined() && fu.NewPassword.V == "" {
 		err["newPassword"] = models.ErrInvalid.Error()
+	}
+
+	if fu.PhotoUUID.IsDefined() && fu.PhotoUUID.V != "" {
+		if _, uuidErr := uuid.Parse(fu.PhotoUUID.V); uuidErr != nil {
+			err["photo_uuid"] = models.ErrInvalid.Error()
+		}
 	}
 
 	if len(err) == 0 {

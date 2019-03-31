@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/pgtype"
+
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
@@ -136,12 +139,17 @@ func GetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	photoUUID := ""
+	if user.PhotoUUID.Status == pgtype.Present {
+		photoUUID = uuid.UUID(user.PhotoUUID.Bytes).String()
+	}
+
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
 		ID:     user.ID.Int,
 		Active: user.Active.Bool,
 		BasicUser: BasicUser{
 			Username:  user.Username.String,
-			PhotoUUID: user.PhotoUUID.String,
+			PhotoUUID: photoUUID, // точно знаем, что там 16 байт
 		},
 	})
 }

@@ -1,9 +1,9 @@
-DROP TABLE IF EXISTS "games";
+DROP TABLE IF EXISTS "games" CASCADE;
 CREATE TABLE "games"
 (
 	id bigserial not null
 		constraint game_pk
 			primary key,
-	title varchar(32) CONSTRAINT title_empty not null check ( title <> '' ),
-	CONSTRAINT uniq_title UNIQUE(title)
+	title CITEXT CONSTRAINT title_empty not null check ( title <> '' ),
+	CONSTRAINT unique_title UNIQUE(title)
 );

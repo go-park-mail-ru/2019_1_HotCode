@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/pgtype"
-
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
@@ -110,12 +109,17 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	photoUUID := ""
+	if user.PhotoUUID.Status == pgtype.Present {
+		photoUUID = uuid.UUID(user.PhotoUUID.Bytes).String()
+	}
+
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
 		ID:     user.ID.Int,
 		Active: user.Active.Bool,
 		BasicUser: BasicUser{
 			Username:  user.Username.String,
-			PhotoUUID: user.PhotoUUID.String,
+			PhotoUUID: photoUUID, // точно знаем, что там 16 байт
 		},
 	})
 }
@@ -180,18 +184,16 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	if updateForm.PhotoUUID.IsDefined() {
+		var photoUUID uuid.UUID
+		status := pgtype.Null
 		if updateForm.PhotoUUID.V != "" {
-			_, err := uuid.FromString(updateForm.PhotoUUID.V)
-			if err != nil {
-				return &ValidationError{
-					"photo_uuid": models.ErrInvalid.Error(),
-				}
-			}
+			status = pgtype.Present
+			photoUUID = uuid.MustParse(updateForm.PhotoUUID.V)
 		}
 
-		user.PhotoUUID = pgtype.Text{
-			String: updateForm.PhotoUUID.V,
-			Status: pgtype.Present,
+		user.PhotoUUID = pgtype.UUID{
+			Bytes:  photoUUID,
+			Status: status,
 		}
 	}
 
