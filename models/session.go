@@ -27,12 +27,8 @@ type Session struct {
 // Set валидирует и сохраняет сессию в хранилище по сгенерированному токену
 // Токен сохраняется в s.Token
 func (ss *SessionsDB) Set(s *Session) error {
-	sessionToken, err := uuid.NewV4()
-	if err != nil {
-		return errors.Wrap(err, "session token generate error")
-	}
-
-	err = storage.Set(sessionToken.String(), s.Payload, s.ExpiresAfter).Err()
+	sessionToken := uuid.NewV4()
+	err := storage.Set(sessionToken.String(), s.Payload, s.ExpiresAfter).Err()
 	if err != nil {
 		return errors.Wrap(err, "redis save error")
 	}
