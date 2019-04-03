@@ -1,4 +1,4 @@
-package controllers
+package users
 
 import (
 	"encoding/json"
@@ -8,22 +8,26 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/pgtype"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/pkg/errors"
 )
 
-// SessionPayload структура, которая хранится в session storage
-type SessionPayload struct {
-	ID     int64 `json:"id"`
-	PwdVer int64 `json:"pwd_ver"`
+// SessionInfo достаёт инфу о юзере из контекстаs
+func SessionInfo(r *http.Request) *SessionPayload {
+	if rv := r.Context().Value(SessionInfoKey); rv != nil {
+		if rInfo, ok := rv.(*SessionPayload); ok {
+			return rInfo
+		}
+	}
+
+	return nil
 }
 
 // CreateSession вход + кука
 func CreateSession(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "SignInUser")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "SignInUser")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 
 	form := &FormUser{}
 	err := utils.DecodeBodyJSON(r.Body, form)
@@ -32,9 +36,9 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := createSessionImpl(form)
+	session, err := CreateSessionImpl(form)
 	if err != nil {
-		if validErr, ok := err.(*ValidationError); ok {
+		if validErr, ok := err.(*utils.ValidationError); ok {
 			errWriter.WriteValidationError(validErr)
 			return
 		}
@@ -54,28 +58,21 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func createSessionImpl(form *FormUser) (*models.Session, error) {
+func CreateSessionImpl(form *FormUser) (*Session, error) {
 	if err := form.Validate(); err != nil {
 		return nil, err
 	}
 
-	user, err := models.Users.GetUserByUsername(form.Username)
+	user, err := Users.GetUserByUsername(form.Username)
 	if err != nil {
-		return nil, &ValidationError{
-			"username": models.ErrNotExists.Error(),
+		return nil, &utils.ValidationError{
+			"username": utils.ErrNotExists.Error(),
 		}
 	}
 
-	// пользователь удалён
-	if !user.Active.Bool {
-		return nil, &ValidationError{
-			"username": models.ErrNotExists.Error(),
-		}
-	}
-
-	if !models.Users.CheckPassword(user, form.Password) {
-		return nil, &ValidationError{
-			"password": models.ErrInvalid.Error(),
+	if !Users.CheckPassword(user, form.Password) {
+		return nil, &utils.ValidationError{
+			"password": utils.ErrInvalid.Error(),
 		}
 	}
 
@@ -87,11 +84,11 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 		return nil, errors.Wrap(err, "info marshal error")
 	}
 
-	session := &models.Session{
+	session := &Session{
 		Payload:      data,
 		ExpiresAfter: time.Hour * 24 * 30,
 	}
-	err = models.Sessions.Set(session)
+	err = Sessions.Set(session)
 	if err != nil {
 		return nil, errors.Wrap(err, "set session error")
 	}
@@ -101,8 +98,8 @@ func createSessionImpl(form *FormUser) (*models.Session, error) {
 
 // DeleteSession выход + удаление куки
 func DeleteSession(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "SignOutUser")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "SignOutUser")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 
 	cookie, err := r.Cookie("JSESSIONID")
 	if err != nil {
@@ -110,10 +107,10 @@ func DeleteSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session := &models.Session{
+	session := &Session{
 		Token: cookie.Value,
 	}
-	err = models.Sessions.Delete(session)
+	err = Sessions.Delete(session)
 	if err != nil {
 		errWriter.WriteWarn(http.StatusInternalServerError, errors.Wrap(err, "session delete error"))
 		return
@@ -127,13 +124,17 @@ func DeleteSession(w http.ResponseWriter, r *http.Request) {
 
 // GetSession возвращает сессмю
 func GetSession(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "GetSession")
-	errWriter := NewErrorResponseWriter(w, logger)
-	info := UserInfo(r)
+	logger := utils.GetLogger(r, "GetSession")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
+	info := SessionInfo(r)
+	if info == nil {
+		errWriter.WriteWarn(http.StatusUnauthorized, errors.New("session info is not presented"))
+		return
+	}
 
-	user, err := models.Users.GetUserByID(info.ID)
+	user, err := Users.GetUserByID(info.ID)
 	if err != nil {
-		if errors.Cause(err) == models.ErrNotExists {
+		if errors.Cause(err) == utils.ErrNotExists {
 			errWriter.WriteWarn(http.StatusUnauthorized, errors.Wrap(err, "user not exists"))
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, err)

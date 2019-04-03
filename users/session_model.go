@@ -1,7 +1,9 @@
-package models
+package users
 
 import (
 	"time"
+
+	"github.com/go-park-mail-ru/2019_1_HotCode/storage"
 
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
@@ -15,7 +17,13 @@ type SessionAccessObject interface {
 }
 
 // SessionsDB implementation of SessionAccessObject
-type SessionsDB struct{}
+type Conn struct{}
+
+var Sessions SessionAccessObject
+
+func init() {
+	Sessions = &Conn{}
+}
 
 // Session модель для работы с сессиями
 type Session struct {
@@ -26,9 +34,9 @@ type Session struct {
 
 // Set валидирует и сохраняет сессию в хранилище по сгенерированному токену
 // Токен сохраняется в s.Token
-func (ss *SessionsDB) Set(s *Session) error {
+func (ss *Conn) Set(s *Session) error {
 	sessionToken := uuid.NewV4()
-	err := storage.Set(sessionToken.String(), s.Payload, s.ExpiresAfter).Err()
+	err := storage.Client.Set(sessionToken.String(), s.Payload, s.ExpiresAfter).Err()
 	if err != nil {
 		return errors.Wrap(err, "redis save error")
 	}
@@ -38,8 +46,8 @@ func (ss *SessionsDB) Set(s *Session) error {
 }
 
 // Delete удаляет сессию с токен s.Token из хранилища
-func (ss *SessionsDB) Delete(s *Session) error {
-	err := storage.Del(s.Token).Err()
+func (ss *Conn) Delete(s *Session) error {
+	err := storage.Client.Del(s.Token).Err()
 	if err != nil {
 		return errors.Wrap(err, "redis delete error")
 	}
@@ -48,8 +56,8 @@ func (ss *SessionsDB) Delete(s *Session) error {
 }
 
 // GetSession получает сессию из хранилища по токену
-func (ss *SessionsDB) GetSession(token string) (*Session, error) {
-	data, err := storage.Get(token).Bytes()
+func (ss *Conn) GetSession(token string) (*Session, error) {
+	data, err := storage.Client.Get(token).Bytes()
 	if err != nil {
 		return nil, errors.Wrap(err, "redis get error")
 	}

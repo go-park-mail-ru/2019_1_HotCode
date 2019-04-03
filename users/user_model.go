@@ -1,31 +1,40 @@
-package models
+package users
 
 import (
 	"strconv"
+
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
+
+	"github.com/go-park-mail-ru/2019_1_HotCode/database"
 
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/pgtype"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
-	// драйвер Database
 )
 
 // UserAccessObject DAO for User model
 type UserAccessObject interface {
-	GetUserByID(id int64) (*User, error)
-	GetUserByUsername(username string) (*User, error)
+	GetUserByID(id int64) (*UserModel, error)
+	GetUserByUsername(username string) (*UserModel, error)
 
-	Create(u *User) error
-	Save(u *User) error
-	CheckPassword(u *User, password string) bool
+	Create(u *UserModel) error
+	Save(u *UserModel) error
+	CheckPassword(u *UserModel, password string) bool
 }
 
-// UsersDB implementation of UserAccessObject
-type UsersDB struct{}
+// AccessObject implementation of UserAccessObject
+type AccessObject struct{}
+
+var Users UserAccessObject
+
+func init() {
+	Users = &AccessObject{}
+}
 
 // User model for users table
-type User struct {
+type UserModel struct {
 	ID            pgtype.Int8
 	Username      pgtype.Varchar
 	PhotoUUID     pgtype.UUID
@@ -36,7 +45,7 @@ type User struct {
 }
 
 // Create создаёт запись в базе с новыми полями
-func (us *UsersDB) Create(u *User) error {
+func (us *AccessObject) Create(u *UserModel) error {
 	var err error
 	hashedPass, err := bcrypt.GenerateFromPassword([]byte(*u.Password), bcrypt.MinCost)
 	if err != nil {
@@ -47,7 +56,7 @@ func (us *UsersDB) Create(u *User) error {
 		Status: pgtype.Present,
 	}
 
-	tx, err := db.conn.Begin()
+	tx, err := database.Conn.Begin()
 	if err != nil {
 		return errors.Wrap(err, "can not open user create transaction")
 	}
@@ -56,7 +65,7 @@ func (us *UsersDB) Create(u *User) error {
 	_, err = us.getUserImpl(tx, "username", u.Username.String)
 	if err != pgx.ErrNoRows {
 		if err == nil {
-			return ErrUsernameTaken
+			return utils.ErrTaken
 		}
 		return errors.Wrap(err, "select duplicate errors")
 	}
@@ -75,7 +84,7 @@ func (us *UsersDB) Create(u *User) error {
 }
 
 // Save сохраняет юзера в базу
-func (us *UsersDB) Save(u *User) error {
+func (us *AccessObject) Save(u *UserModel) error {
 	if u.Password != nil {
 		newPass, err := bcrypt.GenerateFromPassword([]byte(*u.Password), bcrypt.MinCost)
 		if err != nil {
@@ -87,7 +96,7 @@ func (us *UsersDB) Save(u *User) error {
 		}
 	}
 
-	tx, err := db.conn.Begin()
+	tx, err := database.Conn.Begin()
 	if err != nil {
 		return errors.Wrap(err, "can not open 'user Save' transaction")
 	}
@@ -95,7 +104,7 @@ func (us *UsersDB) Save(u *User) error {
 
 	du, err := us.getUserImpl(tx, "username", u.Username.String)
 	if err == nil && u.ID != du.ID {
-		return ErrUsernameTaken
+		return utils.ErrTaken
 	} else if err != nil && err != pgx.ErrNoRows {
 		return errors.Wrap(err, "get user save error")
 	}
@@ -121,17 +130,17 @@ func (us *UsersDB) Save(u *User) error {
 }
 
 // CheckPassword проверяет пароль у юзера и сохранённый в модели
-func (us *UsersDB) CheckPassword(u *User, password string) bool {
+func (us *AccessObject) CheckPassword(u *UserModel, password string) bool {
 	err := bcrypt.CompareHashAndPassword(u.PasswordCrypt.Bytes, []byte(password))
 	return err == nil
 }
 
 // GetUserByID получает юзера по id
-func (us *UsersDB) GetUserByID(id int64) (*User, error) {
-	u, err := us.getUserImpl(db.conn, "id", strconv.FormatInt(id, 10))
+func (us *AccessObject) GetUserByID(id int64) (*UserModel, error) {
+	u, err := us.getUserImpl(database.Conn, "id", strconv.FormatInt(id, 10))
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, ErrNotExists
+			return nil, utils.ErrNotExists
 		}
 
 		return nil, errors.Wrap(err, "get user by id error")
@@ -141,12 +150,12 @@ func (us *UsersDB) GetUserByID(id int64) (*User, error) {
 }
 
 // GetUserByUsername получает юзера по имени
-func (us *UsersDB) GetUserByUsername(username string) (*User, error) {
-	u, err := us.getUserImpl(db.conn, "username", username)
+func (us *AccessObject) GetUserByUsername(username string) (*UserModel, error) {
+	u, err := us.getUserImpl(database.Conn, "username", username)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, ErrNotExists
+			return nil, utils.ErrNotExists
 		}
 
 		return nil, errors.Wrap(err, "get user by username error")
@@ -155,8 +164,8 @@ func (us *UsersDB) GetUserByUsername(username string) (*User, error) {
 	return u, nil
 }
 
-func (us *UsersDB) getUserImpl(q queryer, field, value string) (*User, error) {
-	u := &User{}
+func (us *AccessObject) getUserImpl(q database.Queryer, field, value string) (*UserModel, error) {
+	u := &UserModel{}
 
 	row := q.QueryRow(`SELECT u.id, u.username, u.password,
 	 					u.active, u.photo_uuid, u.pwd_ver FROM users u WHERE `+field+` = $1;`, value)

@@ -1,4 +1,4 @@
-package controllers
+package games
 
 import (
 	"net/http"
@@ -6,9 +6,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/go-park-mail-ru/2019_1_HotCode/users"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
-
-	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -16,13 +15,13 @@ import (
 
 // GetGame получает объект игры
 func GetGame(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "GetGame")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "GetGame")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
-	game, err := models.Games.GetGameBySlug(vars["game_slug"])
+	game, err := Games.GetGameBySlug(vars["game_slug"])
 	if err != nil {
-		if errors.Cause(err) == models.ErrNotExists {
+		if errors.Cause(err) == utils.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "game not exists"))
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get game method error"))
@@ -45,10 +44,10 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 
 // GetGameList gets list of games
 func GetGameList(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "GetGameList")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "GetGameList")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 
-	games, err := models.Games.GetGameList()
+	games, err := Games.GetGameList()
 	if err != nil {
 		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get game list method error"))
 
@@ -69,8 +68,8 @@ func GetGameList(w http.ResponseWriter, r *http.Request) {
 
 // GetGameLeaderboard gets list of leaders in game
 func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "GetGameLeaderboard")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "GetGameLeaderboard")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
 	query := r.URL.Query()
@@ -83,9 +82,9 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 		offsetParam = 0
 	}
 
-	leadersModels, err := models.Games.GetGameLeaderboardBySlug(vars["game_slug"], limitParam, offsetParam)
+	leadersModels, err := Games.GetGameLeaderboardBySlug(vars["game_slug"], limitParam, offsetParam)
 	if err != nil {
-		if errors.Cause(err) == models.ErrNotExists {
+		if errors.Cause(err) == utils.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "game not exists or offset is large"))
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get game method error"))
@@ -96,8 +95,8 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 	leaders := make([]*ScoredUser, len(leadersModels))
 	for i, leader := range leadersModels {
 		leaders[i] = &ScoredUser{
-			InfoUser: InfoUser{
-				BasicUser: BasicUser{
+			InfoUser: users.InfoUser{
+				BasicUser: users.BasicUser{
 					Username: leader.Username.String,
 				},
 				ID:     leader.ID.Int,
@@ -112,13 +111,13 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 
 // GetGameTotalPlayers количество юзеров игравших в game_id
 func GetGameTotalPlayers(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "GetGameTotalPlayers")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "GetGameTotalPlayers")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
-	totalCount, err := models.Games.GetGameTotalPlayersBySlug(vars["game_slug"])
+	totalCount, err := Games.GetGameTotalPlayersBySlug(vars["game_slug"])
 	if err != nil {
-		if errors.Cause(err) == models.ErrNotExists {
+		if errors.Cause(err) == utils.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "game not exists"))
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get game method error"))

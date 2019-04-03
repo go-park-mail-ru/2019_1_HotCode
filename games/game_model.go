@@ -1,6 +1,10 @@
-package models
+package games
 
 import (
+	"github.com/go-park-mail-ru/2019_1_HotCode/database"
+	"github.com/go-park-mail-ru/2019_1_HotCode/users"
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
+
 	"github.com/jackc/pgx/pgtype"
 	"github.com/pkg/errors"
 
@@ -10,17 +14,23 @@ import (
 
 // GameAccessObject DAO for User model
 type GameAccessObject interface {
-	GetGameBySlug(slug string) (*Game, error)
+	GetGameBySlug(slug string) (*GameModel, error)
 	GetGameTotalPlayersBySlug(slug string) (int64, error)
-	GetGameList() ([]*Game, error)
-	GetGameLeaderboardBySlug(slug string, limit, offset int) ([]*ScoredUser, error)
+	GetGameList() ([]*GameModel, error)
+	GetGameLeaderboardBySlug(slug string, limit, offset int) ([]*ScoredUserModel, error)
 }
 
-// GamesDB implementation of GameAccessObject
-type GamesDB struct{}
+// AccessObject implementation of GameAccessObject
+type AccessObject struct{}
+
+var Games GameAccessObject
+
+func init() {
+	Games = &AccessObject{}
+}
 
 // Game модель для таблицы games
-type Game struct {
+type GameModel struct {
 	ID             pgtype.Int8
 	Slug           pgtype.Text
 	Title          pgtype.Text
@@ -32,17 +42,17 @@ type Game struct {
 }
 
 // ScoredUser User with score
-type ScoredUser struct {
-	User
+type ScoredUserModel struct {
+	users.UserModel
 	Score pgtype.Int4
 }
 
-func (gs *GamesDB) GetGameBySlug(slug string) (*Game, error) {
-	g, err := gs.getGameImpl(db.conn, "slug", slug)
+func (gs *AccessObject) GetGameBySlug(slug string) (*GameModel, error) {
+	g, err := gs.getGameImpl(database.Conn, "slug", slug)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, ErrNotExists
+			return nil, utils.ErrNotExists
 		}
 
 		return nil, errors.Wrap(err, "get game by slug error")
@@ -52,8 +62,8 @@ func (gs *GamesDB) GetGameBySlug(slug string) (*Game, error) {
 }
 
 // GetGameTotalPlayersByID получение общего количества игроков
-func (gs *GamesDB) GetGameTotalPlayersBySlug(slug string) (int64, error) {
-	tx, err := db.conn.Begin()
+func (gs *AccessObject) GetGameTotalPlayersBySlug(slug string) (int64, error) {
+	tx, err := database.Conn.Begin()
 	if err != nil {
 		return 0, errors.Wrap(err, "can not open 'GetGameTotalPlayersByID' transaction")
 	}
@@ -62,7 +72,7 @@ func (gs *GamesDB) GetGameTotalPlayersBySlug(slug string) (int64, error) {
 	g, err := gs.getGameImpl(tx, "slug", slug)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return 0, ErrNotExists
+			return 0, utils.ErrNotExists
 		}
 
 		return 0, errors.Wrap(err, "'GetGameTotalPlayersByID' can not get game by id")
@@ -83,10 +93,10 @@ func (gs *GamesDB) GetGameTotalPlayersBySlug(slug string) (int64, error) {
 }
 
 // GetGameLeaderboardBySlug получаем leaderboard по slug
-func (gs *GamesDB) GetGameLeaderboardBySlug(slug string, limit, offset int) ([]*ScoredUser, error) {
+func (gs *AccessObject) GetGameLeaderboardBySlug(slug string, limit, offset int) ([]*ScoredUserModel, error) {
 	// узнаём количество
 
-	rows, err := db.conn.Query(`SELECT u.id, u.username, u.photo_uuid, u.active, ug.score FROM users u
+	rows, err := database.Conn.Query(`SELECT u.id, u.username, u.photo_uuid, u.active, ug.score FROM users u
 					LEFT JOIN users_games ug on u.id = ug.user_id
 					RIGHT JOIN games g on ug.game_id = g.id
 					WHERE g.slug = $1 ORDER BY ug.score DESC OFFSET $2 LIMIT $3;`, slug, offset, limit)
@@ -95,9 +105,9 @@ func (gs *GamesDB) GetGameLeaderboardBySlug(slug string, limit, offset int) ([]*
 	}
 	defer rows.Close()
 
-	leaderboard := make([]*ScoredUser, 0)
+	leaderboard := make([]*ScoredUserModel, 0)
 	for rows.Next() {
-		scoredUser := &ScoredUser{}
+		scoredUser := &ScoredUserModel{}
 		err = rows.Scan(&scoredUser.ID, &scoredUser.Username,
 			&scoredUser.PhotoUUID, &scoredUser.Active,
 			&scoredUser.Score)
@@ -108,15 +118,15 @@ func (gs *GamesDB) GetGameLeaderboardBySlug(slug string, limit, offset int) ([]*
 	}
 
 	if len(leaderboard) == 0 {
-		return nil, ErrNotExists
+		return nil, utils.ErrNotExists
 	}
 
 	return leaderboard, nil
 }
 
 // GetGameList returns full list of active games
-func (gs *GamesDB) GetGameList() ([]*Game, error) {
-	rows, err := db.conn.Query(`SELECT g.id, g.slug, g.title, g.description,
+func (gs *AccessObject) GetGameList() ([]*GameModel, error) {
+	rows, err := database.Conn.Query(`SELECT g.id, g.slug, g.title, g.description,
 								g.rules, g.code_example, g.logo_uuid, g.background_uuid
 								FROM games g`)
 	if err != nil {
@@ -124,9 +134,9 @@ func (gs *GamesDB) GetGameList() ([]*Game, error) {
 	}
 	defer rows.Close()
 
-	games := make([]*Game, 0)
+	games := make([]*GameModel, 0)
 	for rows.Next() {
-		g := &Game{}
+		g := &GameModel{}
 		err = rows.Scan(&g.ID, &g.Slug, &g.Title, &g.Description,
 			&g.Rules, &g.CodeExample, &g.LogoUUID, &g.BackgroundUUID)
 		if err != nil {
@@ -138,8 +148,8 @@ func (gs *GamesDB) GetGameList() ([]*Game, error) {
 	return games, nil
 }
 
-func (gs *GamesDB) getGameImpl(q queryer, field, value string) (*Game, error) {
-	g := &Game{}
+func (gs *AccessObject) getGameImpl(q database.Queryer, field, value string) (*GameModel, error) {
+	g := &GameModel{}
 
 	row := q.QueryRow(`SELECT g.id, g.slug, g.title, g.description,
 						g.rules, g.code_example, g.logo_uuid, g.background_uuid

@@ -11,8 +11,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jcftang/logentriesrus"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/controllers"
-	"github.com/go-park-mail-ru/2019_1_HotCode/models"
+	"github.com/go-park-mail-ru/2019_1_HotCode/bots"
+	"github.com/go-park-mail-ru/2019_1_HotCode/database"
+	"github.com/go-park-mail-ru/2019_1_HotCode/games"
+	"github.com/go-park-mail-ru/2019_1_HotCode/storage"
+	"github.com/go-park-mail-ru/2019_1_HotCode/users"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -33,19 +36,21 @@ func NewHandler() *Handler {
 	// этот роутер будет отвечать за первую(и пока единственную) версию апишки
 	r := mux.NewRouter().PathPrefix("/v1").Subrouter()
 
-	r.HandleFunc("/sessions", controllers.WithAuthentication(controllers.GetSession)).Methods("GET")
-	r.HandleFunc("/sessions", controllers.CreateSession).Methods("POST")
-	r.HandleFunc("/sessions", controllers.WithAuthentication(controllers.DeleteSession)).Methods("DELETE")
+	r.HandleFunc("/sessions", users.WithAuthentication(users.GetSession)).Methods("GET")
+	r.HandleFunc("/sessions", users.CreateSession).Methods("POST")
+	r.HandleFunc("/sessions", users.WithAuthentication(users.DeleteSession)).Methods("DELETE")
 
-	r.HandleFunc("/users", controllers.CreateUser).Methods("POST")
-	r.HandleFunc("/users", controllers.WithAuthentication(controllers.UpdateUser)).Methods("PUT")
-	r.HandleFunc("/users/{user_id:[0-9]+}", controllers.GetUser).Methods("GET")
-	r.HandleFunc("/users/used", WithLimiter(controllers.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
+	r.HandleFunc("/users", users.CreateUser).Methods("POST")
+	r.HandleFunc("/users", users.WithAuthentication(users.UpdateUser)).Methods("PUT")
+	r.HandleFunc("/users/{user_id:[0-9]+}", users.GetUser).Methods("GET")
+	r.HandleFunc("/users/used", WithLimiter(users.CheckUsername, rate.NewLimiter(3, 5))).Methods("POST")
 
-	r.HandleFunc("/games", controllers.GetGameList).Methods("GET")
-	r.HandleFunc("/games/{game_slug}", controllers.GetGame).Methods("GET")
-	r.HandleFunc("/games/{game_slug}/leaderboard", controllers.GetGameLeaderboard).Methods("GET")
-	r.HandleFunc("/games/{game_slug}/leaderboard/count", controllers.GetGameTotalPlayers).Methods("GET")
+	r.HandleFunc("/games", games.GetGameList).Methods("GET")
+	r.HandleFunc("/games/{game_slug}", games.GetGame).Methods("GET")
+	r.HandleFunc("/games/{game_slug}/leaderboard", games.GetGameLeaderboard).Methods("GET")
+	r.HandleFunc("/games/{game_slug}/leaderboard/count", games.GetGameTotalPlayers).Methods("GET")
+
+	r.HandleFunc("/bots", users.WithAuthentication(bots.CreateBot)).Methods("POST")
 
 	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 	return h
@@ -64,12 +69,12 @@ func init() {
 }
 
 func main() {
-	err := models.ConnectDB(os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
+	err := database.Connect(os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"))
 	if err != nil {
 		log.Fatalf("failed to connect to db; err: %s", err.Error())
 	}
-	err = models.ConnectStorage(os.Getenv("STORAGE_USER"), os.Getenv("STORAGE_PASS"),
+	err = storage.Connect(os.Getenv("STORAGE_USER"), os.Getenv("STORAGE_PASS"),
 		os.Getenv("STORAGE_HOST"))
 	if err != nil {
 		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())

@@ -9,6 +9,25 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// ContextKey ключ для контекста реквеста
+type ContextKey int
+
+const (
+	// RequestUUIDKey ключ, по которому в контексте храниться его уникальный ID
+	RequestUUIDKey ContextKey = 2
+)
+
+// TokenInfo достаёт UUID запроса
+func TokenInfo(r *http.Request) string {
+	if rv := r.Context().Value(RequestUUIDKey); rv != nil {
+		if token, ok := rv.(string); ok {
+			return token
+		}
+	}
+
+	return ""
+}
+
 // DecodeBodyJSON парсит body в переданную структуру
 func DecodeBodyJSON(body io.Reader, v interface{}) error {
 	decoder := json.NewDecoder(body)

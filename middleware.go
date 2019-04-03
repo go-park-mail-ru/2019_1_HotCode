@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/controllers"
-	"github.com/go-park-mail-ru/2019_1_HotCode/models"
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -19,8 +18,8 @@ func RecoverMiddleware(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				log.WithField("method", "RECOVER").Error(err)
-				controllers.NewErrorResponseWriter(w, log.WithField("method", "RecoverMiddleware")).
-					WriteError(http.StatusInternalServerError, models.ErrInternal)
+				utils.NewErrorResponseWriter(w, log.WithField("method", "RecoverMiddleware")).
+					WriteError(http.StatusInternalServerError, utils.ErrInternal)
 			}
 		}()
 
@@ -32,7 +31,7 @@ func RecoverMiddleware(next http.Handler) http.Handler {
 func AccessLogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := uuid.NewV4()
-		ctx := context.WithValue(r.Context(), controllers.RequestUUIDKey, token.String()[:8])
+		ctx := context.WithValue(r.Context(), utils.RequestUUIDKey, token.String()[:8])
 
 		start := time.Now()
 		next.ServeHTTP(w, r.WithContext(ctx))

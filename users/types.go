@@ -1,21 +1,11 @@
-package controllers
+package users
 
 import (
-	"fmt"
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/google/uuid"
 	"github.com/mailru/easyjson/opt"
-
-	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 )
-
-// ValidationError описывает ошибки валидцации
-// в формате "field": "error"
-type ValidationError map[string]string
-
-func (ve *ValidationError) Error() string {
-	return fmt.Sprintf("%+v", *ve)
-}
 
 // BasicUser базовые поля
 type BasicUser struct {
@@ -30,12 +20,6 @@ type InfoUser struct {
 	Active bool  `json:"active"`
 }
 
-// ScoredUser инфа о юзере расширенная его баллами
-type ScoredUser struct {
-	InfoUser
-	Score int32 `json:"score"`
-}
-
 // FormUser BasicUser, расширенный паролем, используется для входа и регистрации
 type FormUser struct {
 	BasicUser
@@ -43,14 +27,14 @@ type FormUser struct {
 }
 
 // Validate валидация полей
-func (fu *FormUser) Validate() *ValidationError {
-	err := ValidationError{}
+func (fu *FormUser) Validate() *utils.ValidationError {
+	err := utils.ValidationError{}
 	if fu.Username == "" {
-		err["username"] = models.ErrRequired.Error()
+		err["username"] = utils.ErrRequired.Error()
 	}
 
 	if fu.Password == "" {
-		err["password"] = models.ErrRequired.Error()
+		err["password"] = utils.ErrRequired.Error()
 	}
 
 	if len(err) == 0 {
@@ -70,18 +54,18 @@ type FormUserUpdate struct {
 
 // Validate валидация формы
 func (fu *FormUserUpdate) Validate() error {
-	err := ValidationError{}
+	err := utils.ValidationError{}
 	if fu.Username.IsDefined() && fu.Username.V == "" {
-		err["username"] = models.ErrInvalid.Error()
+		err["username"] = utils.ErrInvalid.Error()
 	}
 
 	if fu.NewPassword.IsDefined() && fu.NewPassword.V == "" {
-		err["newPassword"] = models.ErrInvalid.Error()
+		err["newPassword"] = utils.ErrInvalid.Error()
 	}
 
 	if fu.PhotoUUID.IsDefined() && fu.PhotoUUID.V != "" {
 		if _, uuidErr := uuid.Parse(fu.PhotoUUID.V); uuidErr != nil {
-			err["photo_uuid"] = models.ErrInvalid.Error()
+			err["photo_uuid"] = utils.ErrInvalid.Error()
 		}
 	}
 
@@ -92,17 +76,14 @@ func (fu *FormUserUpdate) Validate() error {
 	return &err
 }
 
-// Game схема объекта игры для карусельки
-type Game struct {
-	Slug           string `json:"slug"`
-	Title          string `json:"title"`
-	BackgroundUUID string `json:"background_uuid"`
-}
+const (
+	// SessionInfoKey ключ, по которому в контексте
+	// реквеста хранится структура юзера после валидации
+	SessionInfoKey utils.ContextKey = 1
+)
 
-type GameFull struct {
-	Game
-	Description string `json:"description"`
-	Rules       string `json:"rules"`
-	CodeExample string `json:"code_example"`
-	LogoUUID    string `json:"logo_uuid"`
+// SessionPayload структура, которая хранится в session storage
+type SessionPayload struct {
+	ID     int64 `json:"id"`
+	PwdVer int64 `json:"pwd_ver"`
 }
