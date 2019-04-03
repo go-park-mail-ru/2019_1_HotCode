@@ -786,7 +786,10 @@ func TestMiddleware(t *testing.T) {
 	initTests()
 
 	testFunction := func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("kek"))
+		_, err := w.Write([]byte("kek"))
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
 	}
 
 	cases := []*UserTestCase{
@@ -818,15 +821,21 @@ func TestMiddleware(t *testing.T) {
 
 	runTableAPITests(t, cases)
 
-	Sessions.Set(&Session{
+	err := Sessions.Set(&Session{
 		Token:   "kek",
 		Payload: []byte("kek"),
 	})
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
 
-	Sessions.Set(&Session{
+	err = Sessions.Set(&Session{
 		Token:   "kek1",
 		Payload: []byte(`{"kek": "kek"}`),
 	})
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
 
 	cases1 := []*UserTestCase{
 		{ // в редисе кривой JSON

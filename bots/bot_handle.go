@@ -14,6 +14,10 @@ func CreateBot(w http.ResponseWriter, r *http.Request) {
 	logger := utils.GetLogger(r, "CreateBot")
 	errWriter := utils.NewErrorResponseWriter(w, logger)
 	info := users.SessionInfo(r)
+	if info == nil {
+		errWriter.WriteWarn(http.StatusUnauthorized, errors.New("session info is not presented"))
+		return
+	}
 
 	form := &BotUpload{}
 	err := utils.DecodeBodyJSON(r.Body, form)

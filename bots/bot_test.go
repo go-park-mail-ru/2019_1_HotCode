@@ -1,7 +1,12 @@
 package bots
 
 import (
+	"context"
 	"testing"
+
+	"github.com/go-park-mail-ru/2019_1_HotCode/games"
+	"github.com/go-park-mail-ru/2019_1_HotCode/users"
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/testutils"
 
@@ -31,17 +36,6 @@ func setFailureBot(err error) {
 	bt.nextFail = err
 }
 
-func checkFailureBot() error {
-	bt := Bots.(*BotTest)
-	if bt.nextFail != nil {
-		defer func() {
-			bt.nextFail = nil
-		}()
-		return bt.nextFail
-	}
-	return nil
-}
-
 func (bt *BotTest) Create(b *BotModel) error {
 	if bt.nextFail != nil {
 		err := bt.nextFail
@@ -55,9 +49,26 @@ func (bt *BotTest) Create(b *BotModel) error {
 	return nil
 }
 
-type BotTestCase struct {
-	testutils.Case
-	Failure error
+type GameTest struct {
+	games    map[string]games.GameModel
+	nextFail error
+}
+
+func (gt *GameTest) GetGameBySlug(slug string) (*games.GameModel, error) {
+	g := gt.games[slug]
+	return &g, nil
+}
+
+func (gt *GameTest) GetGameTotalPlayersBySlug(slug string) (int64, error) {
+	return 0, nil
+}
+
+func (gt *GameTest) GetGameList() ([]*games.GameModel, error) {
+	return nil, nil
+}
+
+func (gt *GameTest) GetGameLeaderboardBySlug(slug string, limit, offset int) ([]*games.ScoredUserModel, error) {
+	return nil, nil
 }
 
 func initTests() {
@@ -66,6 +77,21 @@ func initTests() {
 		bots:     make(map[int64]BotModel),
 		nextFail: nil,
 	}
+
+	games.Games = &GameTest{
+		games: map[string]games.GameModel{
+			"pong": {
+				ID:   pgtype.Int8{Int: 1, Status: pgtype.Present},
+				Slug: pgtype.Text{String: "pong", Status: pgtype.Present},
+			},
+		},
+		nextFail: nil,
+	}
+}
+
+type BotTestCase struct {
+	testutils.Case
+	Failure error
 }
 
 func runTableAPITests(t *testing.T, cases []*BotTestCase) {
@@ -85,7 +111,93 @@ func runAPITest(t *testing.T, i int, c *BotTestCase) {
 func TestCreateBot(t *testing.T) {
 	initTests()
 
-	cases := []*BotTestCase{}
+	cases := []*BotTestCase{
+		{ // Без токена
+			Case: testutils.Case{
+				Payload:      []byte(`{"code":"const a=0","game_slug":"pong", "lang":"CPP"}`),
+				ExpectedCode: 401,
+				ExpectedBody: `{"message":"session info is not presented"}`,
+				Method:       "POST",
+				Pattern:      "/bots",
+				Function:     CreateBot,
+			},
+		},
+		{ // Неподдерживаемый язык
+			Case: testutils.Case{
+				Payload:      []byte(`{"code":"const a=0","game_slug":"pong", "lang":"CPP"}`),
+				ExpectedCode: 400,
+				ExpectedBody: `{"lang":"invalid"}`,
+				Method:       "POST",
+				Pattern:      "/bots",
+				Function:     CreateBot,
+				Context: context.WithValue(context.Background(),
+					users.SessionInfoKey, &users.SessionPayload{ID: 1, PwdVer: 1}),
+			},
+		},
+		{ // Кривой JSON (без запятых)
+			Case: testutils.Case{
+				Payload:      []byte(`{"code":"const a=0" "game_slug":"pong" "lang":"CPP"}`),
+				ExpectedCode: 400,
+				ExpectedBody: `{"message":"decode body error: invalid character '\"' after object key:value pair"}`,
+				Method:       "POST",
+				Pattern:      "/bots",
+				Function:     CreateBot,
+				Context: context.WithValue(context.Background(),
+					users.SessionInfoKey, &users.SessionPayload{ID: 1, PwdVer: 1}),
+			},
+		},
+		{ // Создали бота
+			Case: testutils.Case{
+				Payload:      []byte(`{"code":"const a=0","game_slug":"pong", "lang":"JS"}`),
+				ExpectedCode: 200,
+				ExpectedBody: `{"id":1,"game_slug":"pong","author_id":1,"is_active":false,"code":"const a=0","lang":"JS"}`,
+				Method:       "POST",
+				Pattern:      "/bots",
+				Function:     CreateBot,
+				Context: context.WithValue(context.Background(),
+					users.SessionInfoKey, &users.SessionPayload{ID: 1, PwdVer: 1}),
+			},
+		},
+		{ // Создали дубликат
+			Case: testutils.Case{
+				Payload:      []byte(`{"code":"const a=0","game_slug":"pong", "lang":"JS"}`),
+				ExpectedCode: 400,
+				ExpectedBody: `{"code":"taken"}`,
+				Method:       "POST",
+				Pattern:      "/bots",
+				Function:     CreateBot,
+				Context: context.WithValue(context.Background(),
+					users.SessionInfoKey, &users.SessionPayload{ID: 1, PwdVer: 1}),
+			},
+			Failure: utils.ErrTaken,
+		},
+		{ // Сломалась база
+			Case: testutils.Case{
+				Payload:      []byte(`{"code":"const a=0","game_slug":"pong", "lang":"JS"}`),
+				ExpectedCode: 500,
+				ExpectedBody: `{"message":"user create error: internal server error"}`,
+				Method:       "POST",
+				Pattern:      "/bots",
+				Function:     CreateBot,
+				Context: context.WithValue(context.Background(),
+					users.SessionInfoKey, &users.SessionPayload{ID: 1, PwdVer: 1}),
+			},
+			Failure: utils.ErrInternal,
+		},
+		{ // Нет такой игры
+			Case: testutils.Case{
+				Payload:      []byte(`{"code":"const a=0","game_slug":"pong", "lang":"JS"}`),
+				ExpectedCode: 400,
+				ExpectedBody: `{"game_slug":"not_exists"}`,
+				Method:       "POST",
+				Pattern:      "/bots",
+				Function:     CreateBot,
+				Context: context.WithValue(context.Background(),
+					users.SessionInfoKey, &users.SessionPayload{ID: 1, PwdVer: 1}),
+			},
+			Failure: utils.ErrNotExists,
+		},
+	}
 
 	runTableAPITests(t, cases)
 }
