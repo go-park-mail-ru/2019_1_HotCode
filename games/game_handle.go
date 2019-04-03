@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/pgtype"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/users"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
@@ -94,10 +95,16 @@ func GetGameLeaderboard(w http.ResponseWriter, r *http.Request) {
 
 	leaders := make([]*ScoredUser, len(leadersModels))
 	for i, leader := range leadersModels {
+		photoUUID := ""
+		if leader.PhotoUUID.Status == pgtype.Present {
+			photoUUID = uuid.UUID(leader.PhotoUUID.Bytes).String()
+		}
+
 		leaders[i] = &ScoredUser{
 			InfoUser: users.InfoUser{
 				BasicUser: users.BasicUser{
-					Username: leader.Username.String,
+					Username:  leader.Username.String,
+					PhotoUUID: photoUUID,
 				},
 				ID:     leader.ID.Int,
 				Active: leader.Active.Bool,

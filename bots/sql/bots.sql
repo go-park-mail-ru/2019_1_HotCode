@@ -8,7 +8,7 @@ CREATE TABLE "bots"
 		CONSTRAINT bot_pk
 			PRIMARY KEY,
 	code TEXT CONSTRAINT code_empty NOT NULL CHECK ( code <> '' ),
-	code_hash CHAR(23) NOT NULL CHECK ( code_hash <> '' ),
+	code_hash BYTEA NOT NULL CHECK ( code_hash <> '' ),
 	language LANG NOT NULL,
 	is_active BOOLEAN NOT NULL DEFAULT FALSE,
 	author_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
