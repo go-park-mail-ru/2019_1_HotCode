@@ -36,3 +36,7 @@ func Connect(dbUser, dbPass, dbHost, dbPort, dbName string) error {
 
 	return nil
 }
+
+func Close() {
+	Conn.Close()
+}

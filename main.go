@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-park-mail-ru/2019_1_HotCode/queue"
+
 	"github.com/gorilla/handlers"
 
 	"golang.org/x/time/rate"
@@ -51,6 +53,8 @@ func NewHandler() *Handler {
 	r.HandleFunc("/games/{game_slug}/leaderboard/count", games.GetGameTotalPlayers).Methods("GET")
 
 	r.HandleFunc("/bots", users.WithAuthentication(bots.CreateBot)).Methods("POST")
+	r.HandleFunc("/bots", users.WithAuthentication(bots.GetBotsList)).Methods("GET")
+	r.HandleFunc("/bots/verification", users.WithAuthentication(bots.OpenVerifyWS)).Methods("GET")
 
 	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 	return h
@@ -74,11 +78,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to db; err: %s", err.Error())
 	}
+	defer database.Close()
+
 	err = storage.Connect(os.Getenv("STORAGE_USER"), os.Getenv("STORAGE_PASS"),
 		os.Getenv("STORAGE_HOST"))
 	if err != nil {
-		log.Fatalf("cant connect to redis session storage; err: %s", err.Error())
+		log.Fatalf("cant connect to session storage; err: %s", err.Error())
 	}
+	defer storage.Close()
+
+	err = queue.Connect(os.Getenv("QUEUE_USER"), os.Getenv("QUEUE_PASS"),
+		os.Getenv("QUEUE_HOST"), os.Getenv("QUEUE_PORT"))
+	if err != nil {
+		log.Fatalf("can not connect to queue processor: %s", err.Error())
+	}
+	defer queue.Close()
 
 	h := NewHandler()
 

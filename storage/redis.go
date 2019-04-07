@@ -19,3 +19,7 @@ func Connect(storageUser, storagePass, storageHost string) error {
 
 	return nil
 }
+
+func Close() error {
+	return Client.Close()
+}
