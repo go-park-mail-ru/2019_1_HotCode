@@ -20,5 +20,6 @@ type GameFull struct {
 	Description string `json:"description"`
 	Rules       string `json:"rules"`
 	CodeExample string `json:"code_example"`
+	BotCode     string `json:"bot_code"`
 	LogoUUID    string `json:"logo_uuid"`
 }

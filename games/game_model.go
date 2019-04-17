@@ -37,6 +37,7 @@ type GameModel struct {
 	Description    pgtype.Text
 	Rules          pgtype.Text
 	CodeExample    pgtype.Text
+	BotCode        pgtype.Text
 	LogoUUID       pgtype.UUID
 	BackgroundUUID pgtype.UUID
 }
@@ -127,7 +128,7 @@ func (gs *AccessObject) GetGameLeaderboardBySlug(slug string, limit, offset int)
 // GetGameList returns full list of active games
 func (gs *AccessObject) GetGameList() ([]*GameModel, error) {
 	rows, err := database.Conn.Query(`SELECT g.id, g.slug, g.title, g.description,
-								g.rules, g.code_example, g.logo_uuid, g.background_uuid
+								g.rules, g.code_example, g.bot_code, g.logo_uuid, g.background_uuid
 								FROM games g`)
 	if err != nil {
 		return nil, errors.Wrap(err, "get game list error")
@@ -138,7 +139,7 @@ func (gs *AccessObject) GetGameList() ([]*GameModel, error) {
 	for rows.Next() {
 		g := &GameModel{}
 		err = rows.Scan(&g.ID, &g.Slug, &g.Title, &g.Description,
-			&g.Rules, &g.CodeExample, &g.LogoUUID, &g.BackgroundUUID)
+			&g.Rules, &g.CodeExample, &g.BotCode, &g.LogoUUID, &g.BackgroundUUID)
 		if err != nil {
 			return nil, errors.Wrap(err, "get games scan game error")
 		}
@@ -152,10 +153,10 @@ func (gs *AccessObject) getGameImpl(q database.Queryer, field, value string) (*G
 	g := &GameModel{}
 
 	row := q.QueryRow(`SELECT g.id, g.slug, g.title, g.description,
-						g.rules, g.code_example, g.logo_uuid, g.background_uuid
+						g.rules, g.code_example, g.bot_code, g.logo_uuid, g.background_uuid
 						FROM games g WHERE `+field+` = $1;`, value)
 	if err := row.Scan(&g.ID, &g.Slug, &g.Title, &g.Description,
-		&g.Rules, &g.CodeExample, &g.LogoUUID, &g.BackgroundUUID); err != nil {
+		&g.Rules, &g.CodeExample, &g.BotCode, &g.LogoUUID, &g.BackgroundUUID); err != nil {
 		return nil, err
 	}
 

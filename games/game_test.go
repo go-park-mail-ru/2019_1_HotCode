@@ -96,6 +96,7 @@ func initTests() {
 				Description: pgtype.Text{String: "Very cool game(net)", Status: pgtype.Present},
 				Rules:       pgtype.Text{String: "Do not cheat, please", Status: pgtype.Present},
 				CodeExample: pgtype.Text{String: "const a = 5;", Status: pgtype.Present},
+				BotCode:     pgtype.Text{String: "const a = 5;", Status: pgtype.Present},
 				LogoUUID: pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 					Status: pgtype.Present},
 				BackgroundUUID: pgtype.UUID{Bytes: [16]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
@@ -132,11 +133,14 @@ func TestGetGame(t *testing.T) {
 		{ // Всё ок
 			Case: testutils.Case{
 				ExpectedCode: 200,
-				ExpectedBody: `{"slug":"pong","title":"Pong","background_uuid":"00010203-0405-0607-0809-0a0b0c0d0e0f","description":"Very cool game(net)","rules":"Do not cheat, please","code_example":"const a = 5;","logo_uuid":"01020304-0506-0708-090a-0b0c0d0e0f10"}`,
-				Method:       "GET",
-				Pattern:      "/games/{game_slug}",
-				Endpoint:     "/games/pong",
-				Function:     GetGame,
+				ExpectedBody: `{"slug":"pong","title":"Pong","background_uuid":"00010203-0405-0607-0809-0a0b0c0d0e0f",` +
+					`"description":"Very cool game(net)","rules":"Do not cheat, please",` +
+					`"code_example":"const a = 5;","bot_code":"const a = 5;",` +
+					`"logo_uuid":"01020304-0506-0708-090a-0b0c0d0e0f10"}`,
+				Method:   "GET",
+				Pattern:  "/games/{game_slug}",
+				Endpoint: "/games/pong",
+				Function: GetGame,
 			},
 		},
 		{ // Такой игрули нет
@@ -203,11 +207,12 @@ func TestGetGameLeaderboard(t *testing.T) {
 		{ // Всё ок
 			Case: testutils.Case{
 				ExpectedCode: 200,
-				ExpectedBody: `[{"username":"GDVFox","photo_uuid":"01020304-0506-0708-090a-0b0c0d0e0f10","id":1,"active":false,"score":1337}]`,
-				Method:       "GET",
-				Pattern:      "/games/{game_slug}/leaderboard",
-				Endpoint:     "/games/pong/leaderboard",
-				Function:     GetGameLeaderboard,
+				ExpectedBody: `[{"username":"GDVFox","photo_uuid":"01020304-0506-0708-090a-0b0c0d0e0f10","id":1,` +
+					`"active":false,"score":1337}]`,
+				Method:   "GET",
+				Pattern:  "/games/{game_slug}/leaderboard",
+				Endpoint: "/games/pong/leaderboard",
+				Function: GetGameLeaderboard,
 			},
 		},
 		{ // Такой игрули нет

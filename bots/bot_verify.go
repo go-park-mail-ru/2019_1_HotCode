@@ -25,12 +25,23 @@ type TesterStatusUpdate struct {
 	NewStatus string `json:"new_status"`
 }
 
-type TesterStatusResult struct {
-	IsVerified bool   `json:"verified"`
-	Message    string `json:"message"`
+type TesterStatusError struct {
+	Error string `json:"error"`
 }
 
-func sendForVerifyRPC(bot *BotUpload) (<-chan *TesterStatusQueue, error) {
+type TesterStatusResult struct {
+	Winner int             `json:"result"`
+	States json.RawMessage `json:"states"`
+}
+
+type TestTask struct {
+	Code1    string `json:"code1"`
+	Code2    string `json:"code2"`
+	GameSlug string `json:"game_slug"`
+	Language Lang   `json:"lang"`
+}
+
+func sendForVerifyRPC(task *TestTask) (<-chan *TesterStatusQueue, error) {
 	respQ, err := queue.Channel.QueueDeclare(
 		"", // пакет amqp сам сгенерит
 		false,
@@ -57,7 +68,7 @@ func sendForVerifyRPC(bot *BotUpload) (<-chan *TesterStatusQueue, error) {
 		return nil, errors.Wrap(err, "can not register a consumer")
 	}
 
-	body, err := json.Marshal(bot)
+	body, err := json.Marshal(task)
 	if err != nil {
 		return nil, errors.Wrap(err, "can not marshal bot info")
 	}
@@ -93,7 +104,7 @@ func sendForVerifyRPC(bot *BotUpload) (<-chan *TesterStatusQueue, error) {
 			}
 			out <- testerResp
 
-			if testerResp.Type == "result" {
+			if testerResp.Type == "result" || testerResp.Type == "error" {
 				// отцепились от очереди -- она удалилась
 				err = queue.Channel.Cancel(
 					corrID,
@@ -149,11 +160,10 @@ func processTestingStatus(botID, authorID int64, gameSlug string,
 			}
 
 			newStatus := "Not Verifyed\n"
-			if res.IsVerified {
+			if res.Winner == 1 {
 				newStatus = "Verifyed\n"
 			}
 
-			newStatus += res.Message
 			broadcast <- &BotVerifyStatusMessage{
 				BotID:     botID,
 				AuthorID:  authorID,
@@ -161,7 +171,31 @@ func processTestingStatus(botID, authorID int64, gameSlug string,
 				NewStatus: newStatus,
 			}
 
-			err = Bots.SetBotVerifiedByID(botID, res.IsVerified)
+			err = Bots.SetBotVerifiedByID(botID, res.Winner == 1)
+			if err != nil {
+				logger.Error(errors.Wrap(err, "can update bot active status"))
+				continue
+			}
+
+			status = newStatus
+		case "error":
+			res := &TesterStatusError{}
+			err := json.Unmarshal(event.Body, res)
+			if err != nil {
+				logger.Error(errors.Wrap(err, "can not unmarshal result status body"))
+				continue
+			}
+
+			log.Info(res.Error)
+			newStatus := "Not Verifyed. Error!\n"
+			broadcast <- &BotVerifyStatusMessage{
+				BotID:     botID,
+				AuthorID:  authorID,
+				GameSlug:  gameSlug,
+				NewStatus: newStatus,
+			}
+
+			err = Bots.SetBotVerifiedByID(botID, false)
 			if err != nil {
 				logger.Error(errors.Wrap(err, "can update bot active status"))
 				continue

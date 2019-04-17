@@ -3,6 +3,7 @@ package bots
 import (
 	"net/http"
 
+	"github.com/go-park-mail-ru/2019_1_HotCode/games"
 	"github.com/go-park-mail-ru/2019_1_HotCode/users"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
@@ -42,6 +43,7 @@ func CreateBot(w http.ResponseWriter, r *http.Request) {
 		AuthorID: pgtype.Int8{Int: info.ID, Status: pgtype.Present},
 	}
 
+	game, _ := games.Games.GetGameBySlug(form.GameSlug)
 	if err = Bots.Create(bot); err != nil {
 		switch errors.Cause(err) {
 		case utils.ErrNotExists:
@@ -71,7 +73,12 @@ func CreateBot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// делаем RPC запрос
-	events, err := sendForVerifyRPC(form)
+	events, err := sendForVerifyRPC(&TestTask{
+		Code1:    form.Code,
+		Code2:    game.BotCode.String,
+		GameSlug: game.Slug.String,
+		Language: form.Language,
+	})
 	if err != nil {
 		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "can not call verify rpc"))
 		return
@@ -144,7 +151,8 @@ func OpenVerifyWS(w http.ResponseWriter, r *http.Request) {
 	verifyClient := &BotVerifyClient{
 		SessionID: sessionID,
 		UserID:    info.ID,
-		GameSlug:  gameSlug,
+		//UserID:    1,
+		GameSlug: gameSlug,
 
 		h:    h,
 		conn: c,

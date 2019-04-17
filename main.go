@@ -22,6 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// docker run -d --hostname my-rabbit --name some-rabbit -p 5672:5672  -p 8081:15672 rabbitmq:3-management
 // docker run -d -p 6379:6379 redis
 // docker kill $(docker ps -q)
 // docker rm $(docker ps -a -q)
@@ -55,6 +56,7 @@ func NewHandler() *Handler {
 	r.HandleFunc("/bots", users.WithAuthentication(bots.CreateBot)).Methods("POST")
 	r.HandleFunc("/bots", users.WithAuthentication(bots.GetBotsList)).Methods("GET")
 	r.HandleFunc("/bots/verification", users.WithAuthentication(bots.OpenVerifyWS)).Methods("GET")
+	//r.HandleFunc("/bots/verification", bots.OpenVerifyWS).Methods("GET")
 
 	h.Router = RecoverMiddleware(AccessLogMiddleware(r))
 	return h
@@ -76,21 +78,24 @@ func main() {
 	err := database.Connect(os.Getenv("DB_USER"), os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"))
 	if err != nil {
-		log.Fatalf("failed to connect to db; err: %s", err.Error())
+		log.Errorf("failed to connect to db; err: %s", err.Error())
+		return
 	}
 	defer database.Close()
 
 	err = storage.Connect(os.Getenv("STORAGE_USER"), os.Getenv("STORAGE_PASS"),
 		os.Getenv("STORAGE_HOST"))
 	if err != nil {
-		log.Fatalf("cant connect to session storage; err: %s", err.Error())
+		log.Errorf("cant connect to session storage; err: %s", err.Error())
+		return
 	}
 	defer storage.Close()
 
 	err = queue.Connect(os.Getenv("QUEUE_USER"), os.Getenv("QUEUE_PASS"),
 		os.Getenv("QUEUE_HOST"), os.Getenv("QUEUE_PORT"))
 	if err != nil {
-		log.Fatalf("can not connect to queue processor: %s", err.Error())
+		log.Errorf("can not connect to queue processor: %s", err.Error())
+		return
 	}
 	defer queue.Close()
 
@@ -107,7 +112,7 @@ func main() {
 	log.Printf("MainService successfully started at port %s", port)
 	err = http.ListenAndServe(":"+port, corsMiddleware(h.Router))
 	if err != nil {
-		log.Fatalf("cant start main server. err: %s", err.Error())
+		log.Errorf("cant start main server. err: %s", err.Error())
 		return
 	}
 }

@@ -39,6 +39,7 @@ func GetGame(w http.ResponseWriter, r *http.Request) {
 		Description: game.Description.String,
 		Rules:       game.Rules.String,
 		CodeExample: game.CodeExample.String,
+		BotCode:     game.BotCode.String,
 		LogoUUID:    uuid.UUID(game.LogoUUID.Bytes).String(), // точно 16 байт
 	})
 }
