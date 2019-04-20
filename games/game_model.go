@@ -129,7 +129,7 @@ func (gs *AccessObject) GetGameLeaderboardBySlug(slug string, limit, offset int)
 func (gs *AccessObject) GetGameList() ([]*GameModel, error) {
 	rows, err := database.Conn.Query(`SELECT g.id, g.slug, g.title, g.description,
 								g.rules, g.code_example, g.bot_code, g.logo_uuid, g.background_uuid
-								FROM games g`)
+								FROM games g ORDER BY g.id`)
 	if err != nil {
 		return nil, errors.Wrap(err, "get game list error")
 	}
