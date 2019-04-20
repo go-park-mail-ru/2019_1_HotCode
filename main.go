@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/queue"
-
 	"github.com/gorilla/handlers"
 
 	"golang.org/x/time/rate"
@@ -91,13 +89,13 @@ func main() {
 	}
 	defer storage.Close()
 
-	err = queue.Connect(os.Getenv("QUEUE_USER"), os.Getenv("QUEUE_PASS"),
-		os.Getenv("QUEUE_HOST"), os.Getenv("QUEUE_PORT"))
-	if err != nil {
-		log.Errorf("can not connect to queue processor: %s", err.Error())
-		return
-	}
-	defer queue.Close()
+	// err = queue.Connect(os.Getenv("QUEUE_USER"), os.Getenv("QUEUE_PASS"),
+	// 	os.Getenv("QUEUE_HOST"), os.Getenv("QUEUE_PORT"))
+	// if err != nil {
+	// 	log.Errorf("can not connect to queue processor: %s", err.Error())
+	// 	return
+	// }
+	// defer queue.Close()
 
 	h := NewHandler()
 
