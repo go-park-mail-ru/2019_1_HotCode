@@ -1,68 +1,23 @@
-package controllers
+package users
 
 import (
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/pgtype"
 
-	uuid "github.com/satori/go.uuid"
-
-	"github.com/go-park-mail-ru/2019_1_HotCode/models"
 	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-
-	log "github.com/sirupsen/logrus"
 )
-
-// ContextKey ключ для контекста реквеста
-type ContextKey int
-
-const (
-	// SessionInfoKey ключ, по которому в контексте
-	// реквеста хранится структура юзера после валидации
-	SessionInfoKey ContextKey = 1
-	// RequestUUIDKey ключ, по которому в контексте храниться его уникальный ID
-	RequestUUIDKey ContextKey = 2
-)
-
-// UserInfo достаёт инфу о юзере из контекстаs
-func UserInfo(r *http.Request) *SessionPayload {
-	if rv := r.Context().Value(SessionInfoKey); rv != nil {
-		if rInfo, ok := rv.(*SessionPayload); ok {
-			return rInfo
-		}
-	}
-
-	return nil
-}
-
-// TokenInfo достаёт UUID запроса
-func TokenInfo(r *http.Request) string {
-	if rv := r.Context().Value(RequestUUIDKey); rv != nil {
-		if token, ok := rv.(string); ok {
-			return token
-		}
-	}
-
-	return ""
-}
-
-func getLogger(r *http.Request, funcName string) *log.Entry {
-	token := TokenInfo(r)
-	return log.WithFields(log.Fields{
-		"token":  token,
-		"method": funcName,
-	})
-}
 
 // CheckUsername checks if username already used
 func CheckUsername(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "CheckUsername")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "CheckUsername")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 
 	bUser := &BasicUser{}
 	err := utils.DecodeBodyJSON(r.Body, bUser)
@@ -71,8 +26,8 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.Users.GetUserByUsername(bUser.Username) // если база лежит
-	if err != nil && errors.Cause(err) != models.ErrNotExists {
+	_, err = Users.GetUserByUsername(bUser.Username) // если база лежит
+	if err != nil && errors.Cause(err) != utils.ErrNotExists {
 		errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
 		return
 	}
@@ -90,8 +45,8 @@ func CheckUsername(w http.ResponseWriter, r *http.Request) {
 
 // GetUser get user info by ID
 func GetUser(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "GetUser")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "GetUser")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 	vars := mux.Vars(r)
 
 	userID, err := strconv.ParseInt(vars["user_id"], 10, 64)
@@ -100,9 +55,9 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := models.Users.GetUserByID(userID)
+	user, err := Users.GetUserByID(userID)
 	if err != nil {
-		if errors.Cause(err) == models.ErrNotExists {
+		if errors.Cause(err) == utils.ErrNotExists {
 			errWriter.WriteWarn(http.StatusNotFound, errors.Wrap(err, "user not exists"))
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get user method error"))
@@ -110,21 +65,30 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	photoUUID := ""
+	if user.PhotoUUID.Status == pgtype.Present {
+		photoUUID = uuid.UUID(user.PhotoUUID.Bytes).String()
+	}
+
 	utils.WriteApplicationJSON(w, http.StatusOK, &InfoUser{
 		ID:     user.ID.Int,
 		Active: user.Active.Bool,
 		BasicUser: BasicUser{
 			Username:  user.Username.String,
-			PhotoUUID: user.PhotoUUID.String,
+			PhotoUUID: photoUUID, // точно знаем, что там 16 байт
 		},
 	})
 }
 
 // UpdateUser обновляет данные пользователя
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "UpdateUser")
-	errWriter := NewErrorResponseWriter(w, logger)
-	info := UserInfo(r)
+	logger := utils.GetLogger(r, "UpdateUser")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
+	info := SessionInfo(r)
+	if info == nil {
+		errWriter.WriteWarn(http.StatusUnauthorized, errors.New("session info is not presented"))
+		return
+	}
 
 	updateForm := &FormUserUpdate{}
 	err := utils.DecodeBodyJSON(r.Body, updateForm)
@@ -135,12 +99,12 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	err = updateUserImpl(info, updateForm)
 	if err != nil {
-		if validErr, ok := err.(*ValidationError); ok {
+		if validErr, ok := err.(*utils.ValidationError); ok {
 			errWriter.WriteValidationError(validErr)
 			return
 		}
 
-		if errors.Cause(err) == models.ErrNotExists {
+		if errors.Cause(err) == utils.ErrNotExists {
 			errWriter.WriteWarn(http.StatusUnauthorized, errors.Wrap(err, "user not exists"))
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, err)
@@ -166,7 +130,7 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	// взяли юзера
-	user, err := models.Users.GetUserByID(info.ID)
+	user, err := Users.GetUserByID(info.ID)
 	if err != nil {
 		return errors.Wrap(err, "get user error")
 	}
@@ -180,18 +144,16 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	if updateForm.PhotoUUID.IsDefined() {
+		var photoUUID uuid.UUID
+		status := pgtype.Null
 		if updateForm.PhotoUUID.V != "" {
-			_, err := uuid.FromString(updateForm.PhotoUUID.V)
-			if err != nil {
-				return &ValidationError{
-					"photo_uuid": models.ErrInvalid.Error(),
-				}
-			}
+			status = pgtype.Present
+			photoUUID = uuid.MustParse(updateForm.PhotoUUID.V)
 		}
 
-		user.PhotoUUID = pgtype.Text{
-			String: updateForm.PhotoUUID.V,
-			Status: pgtype.Present,
+		user.PhotoUUID = pgtype.UUID{
+			Bytes:  photoUUID,
+			Status: status,
 		}
 	}
 
@@ -199,14 +161,14 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	// что пользователь знает старый
 	if updateForm.NewPassword.IsDefined() {
 		if !updateForm.OldPassword.IsDefined() {
-			return &ValidationError{
-				"oldPassword": models.ErrRequired.Error(),
+			return &utils.ValidationError{
+				"oldPassword": utils.ErrRequired.Error(),
 			}
 		}
 
-		if !models.Users.CheckPassword(user, updateForm.OldPassword.V) {
-			return &ValidationError{
-				"oldPassword": models.ErrInvalid.Error(),
+		if !Users.CheckPassword(user, updateForm.OldPassword.V) {
+			return &utils.ValidationError{
+				"oldPassword": utils.ErrInvalid.Error(),
 			}
 		}
 
@@ -214,10 +176,10 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 	}
 
 	// пытаемся сохранить
-	if err := models.Users.Save(user); err != nil {
-		if errors.Cause(err) == models.ErrUsernameTaken {
-			return &ValidationError{
-				"username": models.ErrTaken.Error(),
+	if err := Users.Save(user); err != nil {
+		if errors.Cause(err) == utils.ErrTaken {
+			return &utils.ValidationError{
+				"username": utils.ErrTaken.Error(),
 			}
 		}
 
@@ -229,8 +191,8 @@ func updateUserImpl(info *SessionPayload, updateForm *FormUserUpdate) error {
 
 // CreateUser creates new user
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r, "CreateUser")
-	errWriter := NewErrorResponseWriter(w, logger)
+	logger := utils.GetLogger(r, "CreateUser")
+	errWriter := utils.NewErrorResponseWriter(w, logger)
 
 	form := &FormUser{}
 	err := utils.DecodeBodyJSON(r.Body, form)
@@ -244,7 +206,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := &models.User{
+	user := &UserModel{
 		Username: pgtype.Varchar{
 			String: form.Username,
 			Status: pgtype.Present,
@@ -252,10 +214,10 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		Password: &form.Password,
 	}
 
-	if err = models.Users.Create(user); err != nil {
-		if errors.Cause(err) == models.ErrUsernameTaken {
-			errWriter.WriteValidationError(&ValidationError{
-				"username": models.ErrTaken.Error(),
+	if err = Users.Create(user); err != nil {
+		if errors.Cause(err) == utils.ErrTaken {
+			errWriter.WriteValidationError(&utils.ValidationError{
+				"username": utils.ErrTaken.Error(),
 			})
 		} else {
 			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "user create error"))
@@ -264,9 +226,9 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// сразу же логиним юзера
-	session, err := createSessionImpl(form)
+	session, err := CreateSessionImpl(form)
 	if err != nil {
-		if validErr, ok := err.(*ValidationError); ok {
+		if validErr, ok := err.(*utils.ValidationError); ok {
 			errWriter.WriteValidationError(validErr)
 			return
 		}
