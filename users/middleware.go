@@ -1,11 +1,11 @@
-package controllers
+package users
 
 import (
 	"context"
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/models"
+	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/pkg/errors"
 )
@@ -14,8 +14,8 @@ import (
 //nolint: interfacer
 func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := getLogger(r, "CheckUsername")
-		errWriter := NewErrorResponseWriter(w, logger)
+		logger := utils.GetLogger(r, "CheckUsername")
+		errWriter := utils.NewErrorResponseWriter(w, logger)
 
 		cookie, err := r.Cookie("JSESSIONID")
 		if err != nil || cookie == nil {
@@ -23,9 +23,9 @@ func WithAuthentication(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		session, err := models.Sessions.GetSession(cookie.Value)
+		session, err := Sessions.GetSession(cookie.Value)
 		if err != nil {
-			errWriter.WriteError(http.StatusInternalServerError, errors.Wrap(err, "get session error"))
+			errWriter.WriteError(http.StatusUnauthorized, errors.Wrap(err, "get session error"))
 			return
 
 		}
