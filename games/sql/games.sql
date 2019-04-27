@@ -9,6 +9,7 @@ CREATE TABLE "games"
 	description TEXT NOT NULL,
 	rules TEXT NOT NULL,
 	code_example TEXT NOT NULL,
+	bot_code TEXT NOT NULL,
 	logo_uuid UUID NOT NULL,
 	background_uuid UUID NOT NULL,
 	CONSTRAINT unique_title UNIQUE(title)
