@@ -1,7 +1,7 @@
 package users
 
 import (
-	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
+	"github.com/HotCodeGroup/warscript-utils/utils"
 
 	"github.com/google/uuid"
 	"github.com/mailru/easyjson/opt"

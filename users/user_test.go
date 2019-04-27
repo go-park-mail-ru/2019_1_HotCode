@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/HotCodeGroup/warscript-utils/utils"
+
 	"github.com/go-park-mail-ru/2019_1_HotCode/testutils"
-	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
 
 	"github.com/jackc/pgx/pgtype"
 

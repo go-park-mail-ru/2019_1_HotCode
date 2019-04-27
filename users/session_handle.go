@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/pgtype"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
+	"github.com/HotCodeGroup/warscript-utils/utils"
 
 	"github.com/pkg/errors"
 )
@@ -50,6 +50,7 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 	// ставим куку
 	http.SetCookie(w, &http.Cookie{
 		Name:     "JSESSIONID",
+		Domain:   "*",
 		Value:    session.Token,
 		Expires:  time.Now().Add(2628000 * time.Second),
 		HttpOnly: true,

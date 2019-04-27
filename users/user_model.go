@@ -3,7 +3,7 @@ package users
 import (
 	"strconv"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
+	"github.com/HotCodeGroup/warscript-utils/utils"
 
 	"github.com/go-park-mail-ru/2019_1_HotCode/database"
 

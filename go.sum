@@ -1,3 +1,5 @@
+github.com/HotCodeGroup/warscript-utils v0.0.0-20190426174033-635604210119 h1:LiGQl298ri/Jl+scTkSamxw+OtF5EFfcxkCdupMf8Z8=
+github.com/HotCodeGroup/warscript-utils v0.0.0-20190426174033-635604210119/go.mod h1:nGdkdiMdlFr5tcw0XkO4SAXJK5TwaGLEp6vjg1BYe6g=
 github.com/bsphere/le_go v0.0.0-20170215134836-7a984a84b549 h1:QJJnIXZ34OUK5JfWlq1l3n0SfO9g1amiLFIcTECgpq0=
 github.com/bsphere/le_go v0.0.0-20170215134836-7a984a84b549/go.mod h1:313oBJKClgRD/+t59eUnrfG7/xHXZJd7v+SjCacDm4Q=
 github.com/cockroachdb/apd v1.1.0 h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I=

@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/pgtype"
 
-	"github.com/go-park-mail-ru/2019_1_HotCode/utils"
+	"github.com/HotCodeGroup/warscript-utils/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"

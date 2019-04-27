@@ -3,6 +3,7 @@ module github.com/go-park-mail-ru/2019_1_HotCode
 go 1.12
 
 require (
+	github.com/HotCodeGroup/warscript-utils v0.0.0-20190426174033-635604210119
 	github.com/bsphere/le_go v0.0.0-20170215134836-7a984a84b549 // indirect
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/go-redis/redis v6.15.2+incompatible
