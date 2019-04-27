@@ -50,7 +50,7 @@ func CreateSession(w http.ResponseWriter, r *http.Request) {
 	// ставим куку
 	http.SetCookie(w, &http.Cookie{
 		Name:     "JSESSIONID",
-		Domain:   "http://89.208.198.192:8001/",
+		Domain:   "http://89.208.198.192",
 		Value:    session.Token,
 		Expires:  time.Now().Add(2628000 * time.Second),
 		HttpOnly: true,
