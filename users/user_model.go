@@ -41,7 +41,6 @@ type UserModel struct {
 	Password      *string // строка для сохранения
 	Active        pgtype.Bool
 	PasswordCrypt pgtype.Bytea // внутренний хеш для проверки
-	PwdVer        pgtype.Int8
 }
 
 // Create создаёт запись в базе с новыми полями
@@ -168,8 +167,8 @@ func (us *AccessObject) getUserImpl(q database.Queryer, field, value string) (*U
 	u := &UserModel{}
 
 	row := q.QueryRow(`SELECT u.id, u.username, u.password,
-	 					u.active, u.photo_uuid, u.pwd_ver FROM users u WHERE `+field+` = $1;`, value)
-	if err := row.Scan(&u.ID, &u.Username, &u.PasswordCrypt, &u.Active, &u.PhotoUUID, &u.PwdVer); err != nil {
+	 					u.active, u.photo_uuid FROM users u WHERE `+field+` = $1;`, value)
+	if err := row.Scan(&u.ID, &u.Username, &u.PasswordCrypt, &u.Active, &u.PhotoUUID); err != nil {
 		return nil, err
 	}
 

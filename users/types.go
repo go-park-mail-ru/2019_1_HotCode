@@ -84,6 +84,5 @@ const (
 
 // SessionPayload структура, которая хранится в session storage
 type SessionPayload struct {
-	ID     int64 `json:"id"`
-	PwdVer int64 `json:"pwd_ver"`
+	ID int64 `json:"id"`
 }

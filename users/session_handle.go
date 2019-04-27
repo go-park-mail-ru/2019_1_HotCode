@@ -78,8 +78,7 @@ func CreateSessionImpl(form *FormUser) (*Session, error) {
 	}
 
 	data, err := json.Marshal(&SessionPayload{
-		ID:     user.ID.Int,
-		PwdVer: user.PwdVer.Int,
+		ID: user.ID.Int,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "info marshal error")
