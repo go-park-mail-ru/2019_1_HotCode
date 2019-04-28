@@ -241,7 +241,6 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "JSESSIONID",
 		Path:     "/",
-		Domain:   "http://89.208.198.192",
 		Value:    session.Token,
 		Expires:  time.Now().Add(2628000 * time.Second),
 		HttpOnly: true,
